@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
-import { Linkedin, Mail, Microsoft, Chrome } from "lucide-react";
+import { Linkedin, Mail, Chrome } from "lucide-react";
 import { signInWithEmail, signInWithGoogle, signInWithLinkedIn, signInWithMicrosoft, registerWithEmail } from "@/services/authService";
 
 const Login = () => {
@@ -169,7 +168,7 @@ const Login = () => {
                     Google
                   </Button>
                   <Button variant="outline" type="button" onClick={handleMicrosoftSignIn} disabled={isLoading}>
-                    <Microsoft className="h-4 w-4 mr-2" />
+                    <Mail className="h-4 w-4 mr-2" />
                     Microsoft
                   </Button>
                   <Button variant="outline" type="button" onClick={handleLinkedInSignIn} disabled={isLoading} className="bg-linkedin-blue hover:bg-linkedin-dark text-white hover:text-white">
@@ -225,7 +224,7 @@ const Login = () => {
                     Google
                   </Button>
                   <Button variant="outline" type="button" onClick={handleMicrosoftSignIn} disabled={isLoading}>
-                    <Microsoft className="h-4 w-4 mr-2" />
+                    <Mail className="h-4 w-4 mr-2" />
                     Microsoft
                   </Button>
                   <Button variant="outline" type="button" onClick={handleLinkedInSignIn} disabled={isLoading} className="bg-linkedin-blue hover:bg-linkedin-dark text-white hover:text-white">
