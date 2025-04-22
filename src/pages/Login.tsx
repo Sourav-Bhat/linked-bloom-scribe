@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
-import { Linkedin, Mail, Chrome } from "lucide-react";
-import { signInWithEmail, signInWithGoogle, signInWithLinkedIn, signInWithMicrosoft, registerWithEmail } from "@/services/authService";
+import { Chrome } from "lucide-react";
+import { signInWithEmail, signInWithGoogle, registerWithEmail } from "@/services/authService";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -73,38 +74,6 @@ const Login = () => {
     }
   };
 
-  const handleMicrosoftSignIn = async () => {
-    try {
-      setIsLoading(true);
-      await signInWithMicrosoft();
-      navigate("/");
-    } catch (error) {
-      toast({
-        title: "Microsoft sign in failed",
-        description: error instanceof Error ? error.message : "An error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLinkedInSignIn = async () => {
-    try {
-      setIsLoading(true);
-      await signInWithLinkedIn();
-      navigate("/");
-    } catch (error) {
-      toast({
-        title: "LinkedIn sign in failed",
-        description: error instanceof Error ? error.message : "An error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4">
       <Card className="w-full max-w-md">
@@ -162,18 +131,10 @@ const Login = () => {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   <Button variant="outline" type="button" onClick={handleGoogleSignIn} disabled={isLoading}>
                     <Chrome className="h-4 w-4 mr-2" />
                     Google
-                  </Button>
-                  <Button variant="outline" type="button" onClick={handleMicrosoftSignIn} disabled={isLoading}>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Microsoft
-                  </Button>
-                  <Button variant="outline" type="button" onClick={handleLinkedInSignIn} disabled={isLoading} className="bg-linkedin-blue hover:bg-linkedin-dark text-white hover:text-white">
-                    <Linkedin className="h-4 w-4 mr-2" />
-                    LinkedIn
                   </Button>
                 </div>
               </CardContent>
@@ -218,18 +179,10 @@ const Login = () => {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   <Button variant="outline" type="button" onClick={handleGoogleSignIn} disabled={isLoading}>
                     <Chrome className="h-4 w-4 mr-2" />
                     Google
-                  </Button>
-                  <Button variant="outline" type="button" onClick={handleMicrosoftSignIn} disabled={isLoading}>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Microsoft
-                  </Button>
-                  <Button variant="outline" type="button" onClick={handleLinkedInSignIn} disabled={isLoading} className="bg-linkedin-blue hover:bg-linkedin-dark text-white hover:text-white">
-                    <Linkedin className="h-4 w-4 mr-2" />
-                    LinkedIn
                   </Button>
                 </div>
               </CardContent>
