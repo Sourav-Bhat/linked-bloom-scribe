@@ -2,8 +2,6 @@
 import { 
   auth, 
   googleProvider, 
-  microsoftProvider, 
-  linkedinProvider, 
   db 
 } from '@/lib/firebase';
 import {
@@ -12,7 +10,6 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   User,
-  UserCredential,
   onAuthStateChanged
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -52,30 +49,6 @@ export const signInWithGoogle = async (): Promise<User | null> => {
   }
 };
 
-// Sign in with Microsoft
-export const signInWithMicrosoft = async (): Promise<User | null> => {
-  try {
-    const userCredential = await signInWithPopup(auth, microsoftProvider);
-    await createUserProfile(userCredential.user);
-    return userCredential.user;
-  } catch (error) {
-    console.error("Error signing in with Microsoft:", error);
-    throw error;
-  }
-};
-
-// Sign in with LinkedIn
-export const signInWithLinkedIn = async (): Promise<User | null> => {
-  try {
-    const userCredential = await signInWithPopup(auth, linkedinProvider);
-    await createUserProfile(userCredential.user);
-    return userCredential.user;
-  } catch (error) {
-    console.error("Error signing in with LinkedIn:", error);
-    throw error;
-  }
-};
-
 // Create user profile in Firestore
 const createUserProfile = async (user: User) => {
   try {
@@ -105,3 +78,4 @@ export const signOut = async (): Promise<void> => {
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
 };
+
