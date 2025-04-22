@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,8 +25,35 @@ const initialProfile = {
   tone: "professional"
 };
 
+const llmProviderOptions = [
+  { label: "OpenAI", value: "openai" },
+  { label: "Gemini", value: "gemini" }
+];
+
 const Profile = () => {
   const [profile, setProfile] = useState(initialProfile);
+
+  // LLM API Key & Provider state
+  const [llmProvider, setLlmProvider] = useState("openai");
+  const [llmApiKey, setLlmApiKey] = useState("");
+  const [keySaved, setKeySaved] = useState(false);
+
+  // Load API key + provider from localStorage on mount
+  useEffect(() => {
+    const savedProvider = localStorage.getItem("llmProvider") || "openai";
+    const savedKey = localStorage.getItem("llmApiKey") || "";
+    setLlmProvider(savedProvider);
+    setLlmApiKey(savedKey);
+  }, []);
+
+  // Save key/provider to localStorage
+  const handleApiKeySave = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem("llmProvider", llmProvider);
+    localStorage.setItem("llmApiKey", llmApiKey);
+    setKeySaved(true);
+    setTimeout(() => setKeySaved(false), 2000);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -41,6 +68,7 @@ const Profile = () => {
     e.preventDefault();
     // Save profile logic would go here
     alert("Profile updated successfully!");
+    // Here is where the auto-generation of drafts by AI could be initiated on profile save
   };
 
   return (
@@ -150,6 +178,41 @@ const Profile = () => {
                 </Select>
               </div>
             </div>
+
+            {/* LLM API Key & Provider Section */}
+            <div className="space-y-2 pt-2">
+              <Label htmlFor="llmProvider">AI Provider</Label>
+              <Select
+                value={llmProvider}
+                onValueChange={setLlmProvider}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select AI Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {llmProviderOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Label htmlFor="llmApiKey" className="mt-3">API Key for {llmProvider === "openai" ? "OpenAI" : "Gemini"}</Label>
+              <Input
+                id="llmApiKey"
+                name="llmApiKey"
+                type="text"
+                value={llmApiKey}
+                placeholder={`Enter your ${llmProvider === "openai" ? "OpenAI" : "Gemini"} API Key`}
+                onChange={e => setLlmApiKey(e.target.value)}
+                className="w-full"
+              />
+              <form onSubmit={handleApiKeySave}>
+                <Button type="submit" size="sm" className="mt-2">Save API Key</Button>
+                {keySaved && <span className="text-green-600 text-sm ml-3">Key saved!</span>}
+              </form>
+              <div className="text-xs text-muted-foreground mt-1">
+                Your API key is stored locally in your browser only.
+              </div>
+            </div>
           </CardContent>
           
           <CardFooter className="flex justify-between">
@@ -163,3 +226,4 @@ const Profile = () => {
 };
 
 export default Profile;
+
