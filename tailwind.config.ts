@@ -18,6 +18,15 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['Inter', 'sans-serif'],
+			},
+			colors: {
+				linkedin: {
+					blue: '#0a66c2',
+					lightblue: '#e8f3fc',
+					dark: '#004182',
+				},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
