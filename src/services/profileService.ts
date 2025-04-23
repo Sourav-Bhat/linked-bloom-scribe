@@ -1,9 +1,11 @@
-
 import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { User } from "firebase/auth";
 
-// Save user profile
+/**
+ * Save or update user profile and preferences.
+ * Includes: name, industry, role, topics, postsPerWeek, tone, etc.
+ */
 export const saveUserProfile = async (userId: string, data: any) => {
   await setDoc(doc(db, "users", userId), {
     ...data,
@@ -11,7 +13,9 @@ export const saveUserProfile = async (userId: string, data: any) => {
   }, { merge: true });
 };
 
-// Load user profile
+/**
+ * Load user profile and preferences from Firestore.
+ */
 export const getUserProfile = async (userId: string) => {
   const docRef = doc(db, "users", userId);
   const snap = await getDoc(docRef);

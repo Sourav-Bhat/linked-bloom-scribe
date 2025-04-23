@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -67,6 +66,7 @@ const Review = () => {
   
   // State for scheduling
   const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduledTime, setScheduledTime] = useState("");
   
   if (!postData) {
     return (
@@ -85,7 +85,9 @@ const Review = () => {
     setPost(prev => ({ ...prev, [name]: value }));
   };
   
-  const handlePublish = () => {
+  const handlePublish = async () => {
+    // In a real app: update status to 'scheduled', set date/time
+    // Here you could call updateContent(postId, { scheduledDate: ..., status: "scheduled" })
     toast({
       title: "Post Published!",
       description: "Your LinkedIn post has been scheduled for publishing.",
@@ -187,6 +189,7 @@ const Review = () => {
                       id="scheduleTime"
                       type="time"
                       defaultValue={new Date(post.scheduledDate).toISOString().split('T')[1].substring(0, 5)}
+                      onChange={(e) => setScheduledTime(e.target.value)}
                     />
                   </div>
                 </div>

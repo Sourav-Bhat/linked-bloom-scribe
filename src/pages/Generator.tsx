@@ -28,6 +28,7 @@ const Generator = () => {
     includeHashtags: true,
     postLength: "medium",
   });
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     async function loadDrafts() {
@@ -37,7 +38,7 @@ const Generator = () => {
       }
     }
     loadDrafts();
-  }, [user, generatedContent]);
+  }, [user, generatedContent, isSaved]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -56,8 +57,6 @@ const Generator = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
-    
-    // Simulate AI generation with a delay
     setTimeout(() => {
       const mockContent = {
         title: "Revolutionizing Product Design with AI-Powered User Research",
@@ -74,18 +73,18 @@ The most surprising insight? Users often don't explicitly state their most signi
 What tools are you using to enhance your user research? I'd love to hear your experiences.`,
         hashtags: "#ProductManagement #AI #UserResearch #ProductDesign #Innovation"
       };
-      
+
       setGeneratedContent(mockContent);
       setIsGenerating(false);
-      
+
       toast({
         title: "Content Generated",
-        description: "Your LinkedIn post has been created and saved as a draft.",
+        description: "Your LinkedIn post has been created. Don't forget to save it as a draft!",
       });
     }, 2000);
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveContent = async () => {
     if (!user || !generatedContent) return;
     await saveGeneratedContent(user.uid, {
       ...generatedContent,
@@ -93,13 +92,14 @@ What tools are you using to enhance your user research? I'd love to hear your ex
       tone: formData.tone,
       status: "draft"
     });
-    toast({ title: "Draft saved!", description: "You can review or finalize this post later." });
+    toast({ title: "Draft Saved", description: "Your content has been saved as a draft." });
     setGeneratedContent(null);
+    setIsSaved((s) => !s);
   };
 
   const handleFinalizeDraft = async (id: string) => {
     await updateContentStatus(id, "final");
-    toast({ title: "Draft finalized!", description: "You can now schedule this post." });
+    toast({ title: "Draft Finalized", description: "The draft is now marked as final." });
     if (user) {
       const drafts = await getUserContents(user.uid, "draft");
       setDrafts(drafts);
@@ -228,7 +228,7 @@ What tools are you using to enhance your user research? I'd love to hear your ex
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">
-                <Button variant="outline" onClick={handleSaveDraft}>Save as Draft</Button>
+                <Button variant="outline" onClick={handleSaveContent}>Save</Button>
               </CardFooter>
             </Card>
           ) : (

@@ -17,7 +17,6 @@ import { saveUserProfile, getUserProfile } from "@/services/profileService";
 import useAuth from "@/hooks/useAuth";
 import { toast } from "@/components/ui/use-toast";
 
-// Initial profile data
 const initialProfile = {
   name: "John Doe",
   industry: "Technology",
@@ -36,12 +35,10 @@ const Profile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
 
-  // LLM API Key & Provider state
   const [llmProvider, setLlmProvider] = useState("openai");
   const [llmApiKey, setLlmApiKey] = useState("");
   const [keySaved, setKeySaved] = useState(false);
 
-  // Load profile from Firestore
   useEffect(() => {
     async function loadProfile() {
       if (user) {
@@ -56,7 +53,19 @@ const Profile = () => {
     setLlmApiKey(savedKey);
   }, [user]);
 
-  // Save key/provider to localStorage
+  useEffect(() => {
+    if (user) {
+      getUserProfile(user.uid).then((data) => {
+        if (!data) {
+          // Show a mandatory profile completion state if needed
+          // Could add a modal here in future
+        } else {
+          setProfile((prev) => ({ ...prev, ...data }));
+        }
+      });
+    }
+  }, [user]);
+
   const handleApiKeySave = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("llmProvider", llmProvider);
@@ -83,7 +92,6 @@ const Profile = () => {
     } catch (err) {
       toast({ title: "Profile save failed", description: "Please try again.", variant: "destructive" });
     }
-    // Optionally: auto-generate drafts here on save
   };
 
   return (
@@ -194,7 +202,6 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* LLM API Key & Provider Section */}
             <div className="space-y-2 pt-2">
               <Label htmlFor="llmProvider">AI Provider</Label>
               <Select
