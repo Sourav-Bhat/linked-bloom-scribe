@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -46,7 +45,7 @@ const Login = () => {
         title: "Account created successfully",
         description: "Welcome to LinkedIn Content Manager!",
       });
-      navigate("/");
+      navigate("/profile");
     } catch (error) {
       toast({
         title: "Registration failed",

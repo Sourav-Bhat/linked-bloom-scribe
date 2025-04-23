@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -14,6 +13,9 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { saveUserProfile, getUserProfile } from "@/services/profileService";
+import useAuth from "@/hooks/useAuth";
+import { toast } from "@/components/ui/use-toast";
 
 // Initial profile data
 const initialProfile = {
@@ -31,6 +33,7 @@ const llmProviderOptions = [
 ];
 
 const Profile = () => {
+  const { user } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
 
   // LLM API Key & Provider state
@@ -38,13 +41,20 @@ const Profile = () => {
   const [llmApiKey, setLlmApiKey] = useState("");
   const [keySaved, setKeySaved] = useState(false);
 
-  // Load API key + provider from localStorage on mount
+  // Load profile from Firestore
   useEffect(() => {
+    async function loadProfile() {
+      if (user) {
+        const data = await getUserProfile(user.uid);
+        if (data) setProfile(prev => ({ ...prev, ...data }));
+      }
+    }
+    loadProfile();
     const savedProvider = localStorage.getItem("llmProvider") || "openai";
     const savedKey = localStorage.getItem("llmApiKey") || "";
     setLlmProvider(savedProvider);
     setLlmApiKey(savedKey);
-  }, []);
+  }, [user]);
 
   // Save key/provider to localStorage
   const handleApiKeySave = (e: React.FormEvent) => {
@@ -64,11 +74,16 @@ const Profile = () => {
     setProfile(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Save profile logic would go here
-    alert("Profile updated successfully!");
-    // Here is where the auto-generation of drafts by AI could be initiated on profile save
+    if (!user) return;
+    try {
+      await saveUserProfile(user.uid, profile);
+      toast({ title: "Profile updated!", description: "Your preferences have been saved." });
+    } catch (err) {
+      toast({ title: "Profile save failed", description: "Please try again.", variant: "destructive" });
+    }
+    // Optionally: auto-generate drafts here on save
   };
 
   return (
@@ -226,4 +241,3 @@ const Profile = () => {
 };
 
 export default Profile;
-

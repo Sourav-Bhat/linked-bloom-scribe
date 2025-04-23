@@ -1,6 +1,5 @@
-
-import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,11 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { saveGeneratedContent, getUserContents, updateContentStatus } from "@/services/contentService";
+import useAuth from "@/hooks/useAuth";
 
 const Generator = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [drafts, setDrafts] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     topic: "",
     tone: "professional",
@@ -25,6 +28,16 @@ const Generator = () => {
     includeHashtags: true,
     postLength: "medium",
   });
+
+  useEffect(() => {
+    async function loadDrafts() {
+      if (user) {
+        const drafts = await getUserContents(user.uid, "draft");
+        setDrafts(drafts);
+      }
+    }
+    loadDrafts();
+  }, [user, generatedContent]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -70,6 +83,27 @@ What tools are you using to enhance your user research? I'd love to hear your ex
         description: "Your LinkedIn post has been created and saved as a draft.",
       });
     }, 2000);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!user || !generatedContent) return;
+    await saveGeneratedContent(user.uid, {
+      ...generatedContent,
+      topic: formData.topic,
+      tone: formData.tone,
+      status: "draft"
+    });
+    toast({ title: "Draft saved!", description: "You can review or finalize this post later." });
+    setGeneratedContent(null);
+  };
+
+  const handleFinalizeDraft = async (id: string) => {
+    await updateContentStatus(id, "final");
+    toast({ title: "Draft finalized!", description: "You can now schedule this post." });
+    if (user) {
+      const drafts = await getUserContents(user.uid, "draft");
+      setDrafts(drafts);
+    }
   };
 
   return (
@@ -194,19 +228,32 @@ What tools are you using to enhance your user research? I'd love to hear your ex
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">
-                <Button variant="outline">Edit</Button>
-                <Button>Schedule Post</Button>
+                <Button variant="outline" onClick={handleSaveDraft}>Save as Draft</Button>
               </CardFooter>
             </Card>
           ) : (
-            <div className="h-full flex items-center justify-center border border-dashed border-gray-300 rounded-lg p-12">
-              <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-900">No content generated yet</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Fill out the form and click "Generate Post" to create LinkedIn content
-                </p>
-              </div>
-            </div>
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle>Your Drafts</CardTitle>
+                <CardDescription>Review or finalize your drafts below.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {drafts && drafts.length > 0 ? (
+                  <ul className="space-y-3">
+                    {drafts.map((draft: any) => (
+                      <li key={draft.id} className="border rounded px-3 py-2 flex justify-between items-center">
+                        <span>{draft.title || draft.topic}</span>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleFinalizeDraft(draft.id)}>Finalize</Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-sm text-gray-500">No drafts found. Generate new content to save as drafts.</span>
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
