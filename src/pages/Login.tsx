@@ -63,11 +63,22 @@ const Login = () => {
       await signInWithGoogle();
       navigate("/");
     } catch (error) {
-      toast({
-        title: "Google sign in failed",
-        description: error instanceof Error ? error.message : "An error occurred. Please try again.",
-        variant: "destructive",
-      });
+      const errorMessage = error instanceof Error ? error.message : "An error occurred. Please try again.";
+      
+      if (errorMessage.includes("not authorized for Google sign-in")) {
+        toast({
+          title: "Google sign-in not available",
+          description: "Please use email/password login instead. The current domain needs to be configured in Firebase.",
+          variant: "destructive",
+          duration: 8000,
+        });
+      } else {
+        toast({
+          title: "Google sign in failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }

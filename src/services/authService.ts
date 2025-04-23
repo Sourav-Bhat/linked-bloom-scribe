@@ -43,8 +43,17 @@ export const signInWithGoogle = async (): Promise<User | null> => {
     const userCredential = await signInWithPopup(auth, googleProvider);
     await createUserProfile(userCredential.user);
     return userCredential.user;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error signing in with Google:", error);
+    
+    // Check specifically for unauthorized domain error
+    if (error.code === 'auth/unauthorized-domain') {
+      const errorWithInstructions = new Error(
+        "This domain is not authorized for Google sign-in. Please add this domain to your Firebase console under Authentication > Sign-in method > Google > Authorized domains."
+      );
+      throw errorWithInstructions;
+    }
+    
     throw error;
   }
 };
@@ -78,4 +87,3 @@ export const signOut = async (): Promise<void> => {
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
 };
-
