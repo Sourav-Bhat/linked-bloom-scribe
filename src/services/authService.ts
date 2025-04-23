@@ -48,8 +48,11 @@ export const signInWithGoogle = async (): Promise<User | null> => {
     
     // Check specifically for unauthorized domain error
     if (error.code === 'auth/unauthorized-domain') {
+      // Log the current domain
+      console.log('Current Domain:', window.location.origin);
+      
       const errorWithInstructions = new Error(
-        "This domain is not authorized for Google sign-in. Please add this domain to your Firebase console under Authentication > Sign-in method > Google > Authorized domains."
+        `This domain (${window.location.origin}) is not authorized for Google sign-in. Please add this domain to your Firebase console under Authentication > Sign-in method > Google > Authorized domains.`
       );
       throw errorWithInstructions;
     }
