@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +14,7 @@ import Calendar from "./pages/Calendar";
 import Review from "./pages/Review";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Onboarding from "./pages/Onboarding";
 import Layout from "./components/Layout";
 import { createContext } from 'react';
 
