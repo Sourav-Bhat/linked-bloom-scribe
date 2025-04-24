@@ -45,7 +45,7 @@ const Login = () => {
         title: "Account created successfully",
         description: "Welcome to LinkedIn Content Manager!",
       });
-      navigate("/profile");
+      navigate("/onboarding");
     } catch (error) {
       toast({
         title: "Registration failed",
@@ -61,7 +61,7 @@ const Login = () => {
     try {
       setIsLoading(true);
       await signInWithGoogle();
-      navigate("/");
+      navigate("/onboarding");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred. Please try again.";
       

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,11 +14,10 @@ import Review from "./pages/Review";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
+import { createContext } from 'react';
 
 const queryClient = new QueryClient();
 
-// Create a context for authentication
-import { createContext } from 'react';
 export const AuthContext = createContext<{user: User | null}>({user: null});
 
 const App = () => {
@@ -32,7 +30,6 @@ const App = () => {
       setLoading(false);
     });
 
-    // Cleanup subscription
     return () => unsubscribe();
   }, []);
 
@@ -53,6 +50,10 @@ const App = () => {
                 element={user ? <Navigate to="/" /> : <Login />} 
               />
               <Route 
+                path="/onboarding" 
+                element={user ? <Onboarding /> : <Navigate to="/login" />} 
+              />
+              <Route 
                 path="/" 
                 element={user ? <Layout /> : <Navigate to="/login" />}
               >
@@ -62,7 +63,6 @@ const App = () => {
                 <Route path="calendar" element={<Calendar />} />
                 <Route path="review/:postId" element={<Review />} />
               </Route>
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
