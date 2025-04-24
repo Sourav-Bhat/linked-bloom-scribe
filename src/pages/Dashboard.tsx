@@ -1,16 +1,58 @@
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Calendar as CalendarIcon, Edit, Clock } from "lucide-react";
-
-// Mock data for initial dashboard
-const draftPosts = [
-  { id: "1", title: "10 Tips for LinkedIn Networking", scheduled: "Tomorrow, 9:00 AM" },
-  { id: "2", title: "How to Optimize Your LinkedIn Profile", scheduled: "Aug 28, 2:30 PM" },
-];
+import useAuth from "@/hooks/useAuth";
+import { getUserProfile } from "@/services/profileService";
+import { getUserContents } from "@/services/contentService";
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        
+        // Load user profile
+        const profileData = await getUserProfile(user.uid);
+        setProfile(profileData);
+        
+        // Load user content
+        const postsData = await getUserContents(user.uid);
+        setPosts(postsData);
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [user]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64">Loading dashboard data...</div>;
+  }
+
+  // Calculate metrics
+  const totalPosts = posts.length;
+  const draftPosts = posts.filter(post => post.status === "draft");
+  const publishedPosts = posts.filter(post => post.status === "published");
+  const scheduledPosts = posts.filter(post => post.status === "scheduled");
+  
+  // Find the next scheduled post
+  const nextPost = scheduledPosts.sort((a, b) => {
+    return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
+  })[0];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -29,9 +71,9 @@ const Dashboard = () => {
             <Edit className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">2</div>
+            <div className="text-3xl font-bold">{totalPosts || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              0 published · 2 drafts
+              {publishedPosts.length || 0} published · {draftPosts.length || 0} drafts
             </p>
           </CardContent>
         </Card>
@@ -42,9 +84,11 @@ const Dashboard = () => {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Tomorrow</div>
+            <div className="text-2xl font-bold">
+              {nextPost ? new Date(nextPost.scheduledDate).toLocaleDateString() : "No scheduled posts"}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              9:00 AM · 10 Tips for LinkedIn Networking
+              {nextPost ? `${new Date(nextPost.scheduledDate).toLocaleTimeString()} · ${nextPost.title}` : "Create your first post"}
             </p>
           </CardContent>
         </Card>
@@ -55,9 +99,9 @@ const Dashboard = () => {
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">2</div>
+            <div className="text-3xl font-bold">{scheduledPosts.length || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              2 posts scheduled
+              {scheduledPosts.length || 0} posts scheduled
             </p>
           </CardContent>
         </Card>
@@ -77,77 +121,91 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {draftPosts.map((post) => (
-                <tr key={post.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {post.title}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className="px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full">
-                      Draft
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {post.scheduled}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to={`/review/${post.id}`}>Review</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm">Edit</Button>
+              {posts.length > 0 ? (
+                posts.map((post) => (
+                  <tr key={post.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {post.title}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        post.status === "draft" ? "bg-yellow-100 text-yellow-800" : 
+                        post.status === "scheduled" ? "bg-blue-100 text-blue-800" :
+                        "bg-green-100 text-green-800"
+                      }`}>
+                        {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {post.scheduledDate ? new Date(post.scheduledDate).toLocaleString() : "Not scheduled"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to={`/review/${post.id}`}>Review</Link>
+                      </Button>
+                      <Button variant="ghost" size="sm">Edit</Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                    No posts found. Create your first post!
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       </div>
       
       {/* Onboarding prompt for new users */}
-      <Card className="bg-linkedin-lightblue border-linkedin-blue mt-8">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-bold mb-2">Get Started with LinkedIn Content</h3>
-          <p className="mb-4">Complete these steps to set up your content generation strategy:</p>
-          
-          <div className="space-y-3">
-            <div className="flex items-start">
-              <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
-                1
-              </div>
-              <div>
-                <Link to="/profile" className="font-medium text-linkedin-blue hover:underline">
-                  Set up your content profile
-                </Link>
-                <p className="text-sm">Define your topics, interests, and posting preferences</p>
-              </div>
-            </div>
+      {posts.length === 0 && (
+        <Card className="bg-linkedin-lightblue border-linkedin-blue mt-8">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-bold mb-2">Get Started with LinkedIn Content</h3>
+            <p className="mb-4">Complete these steps to set up your content generation strategy:</p>
             
-            <div className="flex items-start">
-              <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
-                2
+            <div className="space-y-3">
+              <div className="flex items-start">
+                <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
+                  1
+                </div>
+                <div>
+                  <Link to="/profile" className="font-medium text-linkedin-blue hover:underline">
+                    Set up your content profile
+                  </Link>
+                  <p className="text-sm">Define your topics, interests, and posting preferences</p>
+                </div>
               </div>
-              <div>
-                <Link to="/generator" className="font-medium text-linkedin-blue hover:underline">
-                  Generate your first post
-                </Link>
-                <p className="text-sm">Create personalized LinkedIn content with AI assistance</p>
+              
+              <div className="flex items-start">
+                <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
+                  2
+                </div>
+                <div>
+                  <Link to="/generator" className="font-medium text-linkedin-blue hover:underline">
+                    Generate your first post
+                  </Link>
+                  <p className="text-sm">Create personalized LinkedIn content with AI assistance</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start">
+                <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
+                  3
+                </div>
+                <div>
+                  <Link to="/calendar" className="font-medium text-linkedin-blue hover:underline">
+                    Plan your content calendar
+                  </Link>
+                  <p className="text-sm">Schedule posts for optimal engagement</p>
+                </div>
               </div>
             </div>
-            
-            <div className="flex items-start">
-              <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
-                3
-              </div>
-              <div>
-                <Link to="/calendar" className="font-medium text-linkedin-blue hover:underline">
-                  Plan your content calendar
-                </Link>
-                <p className="text-sm">Schedule posts for optimal engagement</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

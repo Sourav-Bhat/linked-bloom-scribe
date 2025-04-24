@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { onAuthStateChange } from './services/authService';
+import { hasCompletedOnboarding } from './services/profileService';
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Generator from "./pages/Generator";
@@ -25,11 +26,27 @@ export const AuthContext = createContext<{user: User | null}>({user: null});
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange((authUser) => {
       setUser(authUser);
-      setLoading(false);
+      
+      if (authUser) {
+        // Check if user has completed onboarding
+        hasCompletedOnboarding(authUser.uid)
+          .then(completed => {
+            setOnboardingCompleted(completed);
+            setLoading(false);
+          })
+          .catch(() => {
+            setOnboardingCompleted(false);
+            setLoading(false);
+          });
+      } else {
+        setOnboardingCompleted(null);
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -49,15 +66,23 @@ const App = () => {
             <Routes>
               <Route 
                 path="/login" 
-                element={user ? <Navigate to="/onboarding" /> : <Login />} 
+                element={user ? <Navigate to={onboardingCompleted ? "/" : "/onboarding"} /> : <Login />} 
               />
               <Route 
                 path="/onboarding" 
-                element={user ? <Onboarding /> : <Navigate to="/login" />} 
+                element={
+                  !user ? <Navigate to="/login" /> : 
+                  onboardingCompleted ? <Navigate to="/" /> : 
+                  <Onboarding />
+                } 
               />
               <Route 
                 path="/" 
-                element={user ? <Layout /> : <Navigate to="/login" />}
+                element={
+                  !user ? <Navigate to="/login" /> :
+                  !onboardingCompleted ? <Navigate to="/onboarding" /> :
+                  <Layout />
+                }
               >
                 <Route index element={<Dashboard />} />
                 <Route path="profile" element={<Profile />} />

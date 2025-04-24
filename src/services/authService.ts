@@ -13,6 +13,7 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import { checkUserCollections, initializeUserCollections } from './profileService';
 
 // Register user with email and password
 export const registerWithEmail = async (email: string, password: string): Promise<User | null> => {
@@ -30,6 +31,13 @@ export const registerWithEmail = async (email: string, password: string): Promis
 export const signInWithEmail = async (email: string, password: string): Promise<User | null> => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    // Check if user collections exist and create if they don't
+    const userExists = await checkUserCollections(userCredential.user.uid);
+    if (!userExists) {
+      await createUserProfile(userCredential.user);
+    }
+    
     return userCredential.user;
   } catch (error) {
     console.error("Error signing in:", error);
@@ -41,7 +49,13 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 export const signInWithGoogle = async (): Promise<User | null> => {
   try {
     const userCredential = await signInWithPopup(auth, googleProvider);
-    await createUserProfile(userCredential.user);
+    
+    // Check if user collections exist and create if they don't
+    const userExists = await checkUserCollections(userCredential.user.uid);
+    if (!userExists) {
+      await createUserProfile(userCredential.user);
+    }
+    
     return userCredential.user;
   } catch (error: any) {
     console.error("Error signing in with Google:", error);
@@ -64,13 +78,16 @@ export const signInWithGoogle = async (): Promise<User | null> => {
 // Create user profile in Firestore
 const createUserProfile = async (user: User) => {
   try {
-    await setDoc(doc(db, "users", user.uid), {
+    const userData = {
       email: user.email,
       displayName: user.displayName,
       photoURL: user.photoURL,
       createdAt: new Date(),
       updatedAt: new Date()
-    }, { merge: true });
+    };
+    
+    // Initialize the main user document and all subcollections
+    await initializeUserCollections(user.uid, userData);
   } catch (error) {
     console.error("Error creating user profile:", error);
   }
