@@ -49,7 +49,7 @@ const App = () => {
             <Routes>
               <Route 
                 path="/login" 
-                element={user ? <Navigate to="/" /> : <Login />} 
+                element={user ? <Navigate to="/onboarding" /> : <Login />} 
               />
               <Route 
                 path="/onboarding" 
