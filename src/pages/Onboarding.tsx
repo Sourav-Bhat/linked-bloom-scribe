@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,15 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import useAuth from "@/hooks/useAuth";
-import { saveUserProfile } from "@/services/profileService";
+import { supabase } from "@/integrations/supabase/client";
 
 const Onboarding = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: user?.displayName || "",
-    jobTitle: "",
+    full_name: user?.user_metadata?.full_name || "",
+    job_title: "",
     company: "",
     industry: "",
     bio: ""
@@ -40,11 +39,17 @@ const Onboarding = () => {
 
     try {
       setIsLoading(true);
-      await saveUserProfile(user.uid, {
-        ...formData,
-        onboardingCompleted: true,
-        updatedAt: new Date()
-      });
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...formData,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
       
       toast({
         title: "Profile created!",
@@ -80,7 +85,7 @@ const Onboarding = () => {
               <Input
                 id="fullName"
                 name="fullName"
-                value={formData.fullName}
+                value={formData.full_name}
                 onChange={handleChange}
                 placeholder="John Doe"
                 required
@@ -92,7 +97,7 @@ const Onboarding = () => {
               <Input
                 id="jobTitle"
                 name="jobTitle"
-                value={formData.jobTitle}
+                value={formData.job_title}
                 onChange={handleChange}
                 placeholder="Product Manager"
                 required

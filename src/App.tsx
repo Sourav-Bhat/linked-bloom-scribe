@@ -1,13 +1,11 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
-import { onAuthStateChange } from './services/authService';
-import { hasCompletedOnboarding } from './services/profileService';
+import { createContext, useState, useEffect } from 'react';
+import { User } from '@supabase/supabase-js';
+import { supabase } from './integrations/supabase/client';
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Generator from "./pages/Generator";
@@ -17,7 +15,6 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Layout from "./components/Layout";
-import { createContext } from 'react';
 
 const queryClient = new QueryClient();
 
@@ -29,27 +26,34 @@ const App = () => {
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChange((authUser) => {
-      setUser(authUser);
-      
-      if (authUser) {
-        // Check if user has completed onboarding
-        hasCompletedOnboarding(authUser.uid)
-          .then(completed => {
-            setOnboardingCompleted(completed);
-            setLoading(false);
-          })
-          .catch(() => {
-            setOnboardingCompleted(false);
-            setLoading(false);
-          });
-      } else {
-        setOnboardingCompleted(null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('onboarding_completed')
+            .eq('id', session.user.id)
+            .single();
+            
+          setOnboardingCompleted(data?.onboarding_completed ?? false);
+        } else {
+          setOnboardingCompleted(null);
+        }
+        
         setLoading(false);
       }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (loading) {

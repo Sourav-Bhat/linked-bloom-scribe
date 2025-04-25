@@ -9,7 +9,120 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      analytics: {
+        Row: {
+          engagement_rate: number | null
+          id: string
+          last_updated: string | null
+          posts_count: number | null
+          user_id: string
+        }
+        Insert: {
+          engagement_rate?: number | null
+          id?: string
+          last_updated?: string | null
+          posts_count?: number | null
+          user_id: string
+        }
+        Update: {
+          engagement_rate?: number | null
+          id?: string
+          last_updated?: string | null
+          posts_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      posts: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          hashtags: string | null
+          id: string
+          published_date: string | null
+          scheduled_date: string | null
+          status: string | null
+          title: string | null
+          tone: string | null
+          topic: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          hashtags?: string | null
+          id?: string
+          published_date?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          title?: string | null
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          hashtags?: string | null
+          id?: string
+          published_date?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          title?: string | null
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          bio: string | null
+          company: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string
+          industry: string | null
+          job_title: string | null
+          onboarding_completed: boolean | null
+          posts_per_week: number | null
+          tone: string | null
+          topics: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          bio?: string | null
+          company?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id: string
+          industry?: string | null
+          job_title?: string | null
+          onboarding_completed?: boolean | null
+          posts_per_week?: number | null
+          tone?: string | null
+          topics?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          bio?: string | null
+          company?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          industry?: string | null
+          job_title?: string | null
+          onboarding_completed?: boolean | null
+          posts_per_week?: number | null
+          tone?: string | null
+          topics?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
