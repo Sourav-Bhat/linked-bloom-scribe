@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -34,8 +35,14 @@ const Generator = () => {
     async function loadDrafts() {
       if (user) {
         try {
-          const userDrafts = await getUserContents(user.uid, "draft");
-          setDrafts(userDrafts);
+          const userDrafts = await getUserContents(user.id);
+          // Convert the data to match our ContentPost type
+          const formattedDrafts = userDrafts.map((draft: any) => ({
+            ...draft,
+            scheduledDate: draft.scheduled_date,
+            publishedDate: draft.published_date
+          })) as ContentPost[];
+          setDrafts(formattedDrafts);
         } catch (error) {
           console.error("Error loading drafts:", error);
           toast({
@@ -83,7 +90,10 @@ The most surprising insight? Users often don't explicitly state their most signi
 
 What tools are you using to enhance your user research? I'd love to hear your experiences.`,
         hashtags: "#ProductManagement #AI #UserResearch #ProductDesign #Innovation",
-        status: "draft"
+        status: "draft",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        user_id: user.id
       };
 
       setGeneratedContent(generatedPost);
@@ -107,7 +117,7 @@ What tools are you using to enhance your user research? I'd love to hear your ex
     if (!user || !generatedContent) return;
     
     try {
-      await saveGeneratedContent(user.uid, {
+      await saveGeneratedContent(user.id, {
         ...generatedContent,
         topic: formData.topic,
         tone: formData.tone,
@@ -127,8 +137,13 @@ What tools are you using to enhance your user research? I'd love to hear your ex
         postLength: "medium",
       });
       
-      const updatedDrafts = await getUserContents(user.uid, "draft");
-      setDrafts(updatedDrafts);
+      const updatedDrafts = await getUserContents(user.id);
+      const formattedDrafts = updatedDrafts.map((draft: any) => ({
+        ...draft,
+        scheduledDate: draft.scheduled_date,
+        publishedDate: draft.published_date
+      })) as ContentPost[];
+      setDrafts(formattedDrafts);
     } catch (error) {
       console.error("Error saving content:", error);
       toast({
@@ -143,14 +158,19 @@ What tools are you using to enhance your user research? I'd love to hear your ex
     if (!user) return;
     
     try {
-      await updateContentStatus(user.uid, id, "final");
+      await updateContentStatus(user.id, id, "final");
       toast({ 
         title: "Draft Finalized", 
         description: "The draft is now marked as final." 
       });
       
-      const updatedDrafts = await getUserContents(user.uid, "draft");
-      setDrafts(updatedDrafts);
+      const updatedDrafts = await getUserContents(user.id);
+      const formattedDrafts = updatedDrafts.map((draft: any) => ({
+        ...draft,
+        scheduledDate: draft.scheduled_date,
+        publishedDate: draft.published_date
+      })) as ContentPost[];
+      setDrafts(formattedDrafts);
     } catch (error) {
       console.error("Error finalizing draft:", error);
       toast({

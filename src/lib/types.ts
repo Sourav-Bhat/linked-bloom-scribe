@@ -1,3 +1,4 @@
+
 // Types for our LinkedIn content management app
 
 export interface ContentPost {
@@ -10,21 +11,24 @@ export interface ContentPost {
   tone?: string;
   scheduledDate?: string;
   publishedDate?: string;
-  createdAt: string;
-  updatedAt: string;
-  userId: string;
+  created_at: string; // Changed from createdAt to match Supabase
+  updated_at: string; // Changed from updatedAt to match Supabase
+  user_id: string;    // Changed from userId to match Supabase
 }
 
 export interface UserProfile {
   id: string;
-  name: string;
+  full_name: string; // Changed to match Supabase column
   industry: string;
-  role: string;
-  topics: string[];
-  postsPerWeek: number;
+  job_title: string; // Changed from role to match Supabase
+  topics: string[]; 
+  posts_per_week: number; // Changed from postsPerWeek to match Supabase
   tone: 'professional' | 'friendly' | 'authoritative' | 'educational' | 'inspirational';
-  createdAt: string;
-  updatedAt: string;
+  created_at: string; // Changed from createdAt to match Supabase
+  updated_at: string; // Changed from updatedAt to match Supabase
+  company?: string;
+  bio?: string;
+  onboarding_completed?: boolean;
 }
 
 export interface ContentCalendarEntry {

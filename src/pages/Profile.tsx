@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +17,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { saveUserProfile, getUserProfile } from "@/services/profileService";
 import useAuth from "@/hooks/useAuth";
 import { toast } from "@/components/ui/use-toast";
+import { UserProfile } from "@/lib/types";
 
+// Initial profile state matching our UserProfile type
 const initialProfile = {
-  name: "John Doe",
-  industry: "Technology",
-  role: "Product Manager",
-  topics: "Product Management, UX Design, Technology Trends",
-  postsPerWeek: "3",
-  tone: "professional"
+  full_name: "",
+  industry: "",
+  job_title: "",
+  topics: [] as string[],
+  posts_per_week: 3,
+  tone: "professional" as const,
+  company: "",
+  bio: "",
 };
 
 const llmProviderOptions = [
@@ -33,7 +38,7 @@ const llmProviderOptions = [
 
 const Profile = () => {
   const { user } = useAuth();
-  const [profile, setProfile] = useState(initialProfile);
+  const [profile, setProfile] = useState<Partial<UserProfile>>(initialProfile);
 
   const [llmProvider, setLlmProvider] = useState("openai");
   const [llmApiKey, setLlmApiKey] = useState("");
@@ -42,8 +47,20 @@ const Profile = () => {
   useEffect(() => {
     async function loadProfile() {
       if (user) {
-        const data = await getUserProfile(user.uid);
-        if (data) setProfile(prev => ({ ...prev, ...data }));
+        try {
+          const data = await getUserProfile(user.id);
+          if (data) {
+            // Match the Supabase data structure to our component state
+            setProfile({
+              ...data,
+              // Convert topics to string array if it's not already
+              topics: Array.isArray(data.topics) ? data.topics : 
+                     (data.topics ? data.topics.split(',').map(t => t.trim()) : [])
+            });
+          }
+        } catch (error) {
+          console.error("Error loading profile:", error);
+        }
       }
     }
     loadProfile();
@@ -51,19 +68,6 @@ const Profile = () => {
     const savedKey = localStorage.getItem("llmApiKey") || "";
     setLlmProvider(savedProvider);
     setLlmApiKey(savedKey);
-  }, [user]);
-
-  useEffect(() => {
-    if (user) {
-      getUserProfile(user.uid).then((data) => {
-        if (!data) {
-          // Show a mandatory profile completion state if needed
-          // Could add a modal here in future
-        } else {
-          setProfile((prev) => ({ ...prev, ...data }));
-        }
-      });
-    }
   }, [user]);
 
   const handleApiKeySave = (e: React.FormEvent) => {
@@ -87,7 +91,17 @@ const Profile = () => {
     e.preventDefault();
     if (!user) return;
     try {
-      await saveUserProfile(user.uid, profile);
+      // Convert topics to proper format if needed
+      const preparedProfile = {
+        ...profile,
+        id: user.id,
+        // Ensure topics is an array if coming from a string input
+        topics: typeof profile.topics === 'string' 
+          ? profile.topics.split(',').map(t => t.trim()) 
+          : profile.topics
+      };
+      
+      await saveUserProfile(user.id, preparedProfile);
       toast({ title: "Profile updated!", description: "Your preferences have been saved." });
     } catch (err) {
       toast({ title: "Profile save failed", description: "Please try again.", variant: "destructive" });
