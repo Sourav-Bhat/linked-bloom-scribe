@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const getUserProfile = async (userId: string) => {
@@ -45,4 +44,17 @@ export const checkUserCollections = async (userId: string) => {
     
   if (error) throw error;
   return !!data;
+};
+
+export const hasCompletedProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name, industry, job_title')
+    .eq('id', userId)
+    .maybeSingle();
+    
+  if (error) throw error;
+  
+  // Check if basic profile details are filled
+  return !!(data?.full_name && data?.industry && data?.job_title);
 };

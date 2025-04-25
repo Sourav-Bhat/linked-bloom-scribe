@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +13,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { saveUserProfile, getUserProfile } from "@/services/profileService";
+import { saveUserProfile, getUserProfile, hasCompletedProfile } from "@/services/profileService";
 import useAuth from "@/hooks/useAuth";
 import { toast } from "@/components/ui/use-toast";
 import { UserProfile } from "@/lib/types";
@@ -40,6 +39,7 @@ const Profile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Partial<UserProfile>>(initialProfile);
   const [topicsInput, setTopicsInput] = useState("");
+  const [isNewProfile, setIsNewProfile] = useState(false);
 
   const [llmProvider, setLlmProvider] = useState("openai");
   const [llmApiKey, setLlmApiKey] = useState("");
@@ -61,6 +61,10 @@ const Profile = () => {
               ...data,
               tone: profileTone
             });
+            
+            // Check if basic profile details exist
+            const hasProfile = await hasCompletedProfile(user.id);
+            setIsNewProfile(!hasProfile);
           }
         } catch (error) {
           console.error("Error loading profile:", error);
@@ -131,8 +135,18 @@ const Profile = () => {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Content Profile</h1>
+      <h1 className="text-3xl font-bold mb-6">
+        {isNewProfile ? "Complete Your Profile" : "Content Profile"}
+      </h1>
       
+      {isNewProfile && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+          <p className="text-yellow-800">
+            Please complete your basic profile information to continue.
+          </p>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Profile Information</CardTitle>
