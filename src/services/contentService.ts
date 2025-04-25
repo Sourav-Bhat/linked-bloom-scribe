@@ -1,52 +1,82 @@
+
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from "firebase/firestore";
+import { ContentPost } from "@/lib/types";
 
 /**
  * Save generated content with status: 'draft', 'final', or 'scheduled'.
- * @param userId
- * @param content
- * @returns
  */
-export const saveGeneratedContent = async (userId: string, content: any) => {
-  return await addDoc(collection(db, "posts"), {
-    ...content,
-    userId,
-    status: content.status || "draft",
-    createdAt: new Date(),
-    updatedAt: new Date()
-  });
+export const saveGeneratedContent = async (userId: string, content: Partial<ContentPost>) => {
+  try {
+    // Use user's posts subcollection
+    const userPostsRef = collection(db, "users", userId, "posts");
+    
+    const postData = {
+      ...content,
+      userId,
+      status: content.status || "draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    return await addDoc(userPostsRef, postData);
+  } catch (error) {
+    console.error("Error saving content:", error);
+    throw error;
+  }
 };
 
 /**
  * Get contents by user, optionally filter by status.
- * @param userId
- * @param status optional -- "draft", "final", "scheduled", etc.
  */
 export const getUserContents = async (userId: string, status?: string) => {
-  let q = query(collection(db, "posts"), where("userId", "==", userId));
-  if (status) {
-    q = query(q, where("status", "==", status));
+  try {
+    const userPostsRef = collection(db, "users", userId, "posts");
+    let q = query(userPostsRef);
+    
+    if (status) {
+      q = query(userPostsRef, where("status", "==", status));
+    }
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as ContentPost[];
+  } catch (error) {
+    console.error("Error fetching content:", error);
+    throw error;
   }
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
 /**
  * Update content status (to 'final', 'scheduled', etc)
- * @param postId
- * @param status
  */
-export const updateContentStatus = async (postId: string, status: string) => {
-  const docRef = doc(db, "posts", postId);
-  await updateDoc(docRef, { status, updatedAt: new Date() });
+export const updateContentStatus = async (userId: string, postId: string, status: string) => {
+  try {
+    const docRef = doc(db, "users", userId, "posts", postId);
+    await updateDoc(docRef, { 
+      status, 
+      updatedAt: new Date().toISOString() 
+    });
+  } catch (error) {
+    console.error("Error updating content status:", error);
+    throw error;
+  }
 };
 
 /**
  * Update content fields. Used for editing, scheduling etc.
- * @param postId
- * @param data
  */
-export const updateContent = async (postId: string, data: any) => {
-  const docRef = doc(db, "posts", postId);
-  await updateDoc(docRef, { ...data, updatedAt: new Date() });
+export const updateContent = async (userId: string, postId: string, data: Partial<ContentPost>) => {
+  try {
+    const docRef = doc(db, "users", userId, "posts", postId);
+    await updateDoc(docRef, { 
+      ...data, 
+      updatedAt: new Date().toISOString() 
+    });
+  } catch (error) {
+    console.error("Error updating content:", error);
+    throw error;
+  }
 };

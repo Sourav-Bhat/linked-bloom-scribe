@@ -14,13 +14,14 @@ import {
 } from "@/components/ui/select";
 import { saveGeneratedContent, getUserContents, updateContentStatus } from "@/services/contentService";
 import useAuth from "@/hooks/useAuth";
+import { ContentPost } from "@/lib/types";
 
 const Generator = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<any>(null);
-  const [drafts, setDrafts] = useState<any[]>([]);
+  const [generatedContent, setGeneratedContent] = useState<Partial<ContentPost> | null>(null);
+  const [drafts, setDrafts] = useState<ContentPost[]>([]);
   const [formData, setFormData] = useState({
     topic: "",
     tone: "professional",
@@ -28,17 +29,25 @@ const Generator = () => {
     includeHashtags: true,
     postLength: "medium",
   });
-  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     async function loadDrafts() {
       if (user) {
-        const drafts = await getUserContents(user.uid, "draft");
-        setDrafts(drafts);
+        try {
+          const userDrafts = await getUserContents(user.uid, "draft");
+          setDrafts(userDrafts);
+        } catch (error) {
+          console.error("Error loading drafts:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load drafts. Please try again.",
+            variant: "destructive",
+          });
+        }
       }
     }
     loadDrafts();
-  }, [user, generatedContent, isSaved]);
+  }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -54,11 +63,13 @@ const Generator = () => {
     setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
     setIsGenerating(true);
-    setTimeout(() => {
-      const mockContent = {
+    try {
+      const generatedPost: Partial<ContentPost> = {
         title: "Revolutionizing Product Design with AI-Powered User Research",
         content: `As product managers, we're constantly seeking ways to understand our users better. I've recently integrated AI into our user research process, and the results have been eye-opening.
 
@@ -71,38 +82,82 @@ Here's what we've learned:
 The most surprising insight? Users often don't explicitly state their most significant pain points - AI helps uncover these hidden frustrations.
 
 What tools are you using to enhance your user research? I'd love to hear your experiences.`,
-        hashtags: "#ProductManagement #AI #UserResearch #ProductDesign #Innovation"
+        hashtags: "#ProductManagement #AI #UserResearch #ProductDesign #Innovation",
+        status: "draft"
       };
 
-      setGeneratedContent(mockContent);
-      setIsGenerating(false);
-
+      setGeneratedContent(generatedPost);
       toast({
         title: "Content Generated",
         description: "Your LinkedIn post has been created. Don't forget to save it as a draft!",
       });
-    }, 2000);
+    } catch (error) {
+      console.error("Error generating content:", error);
+      toast({
+        title: "Generation Failed",
+        description: "Failed to generate content. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSaveContent = async () => {
     if (!user || !generatedContent) return;
-    await saveGeneratedContent(user.uid, {
-      ...generatedContent,
-      topic: formData.topic,
-      tone: formData.tone,
-      status: "draft"
-    });
-    toast({ title: "Draft Saved", description: "Your content has been saved as a draft." });
-    setGeneratedContent(null);
-    setIsSaved((s) => !s);
+    
+    try {
+      await saveGeneratedContent(user.uid, {
+        ...generatedContent,
+        topic: formData.topic,
+        tone: formData.tone,
+      });
+      
+      toast({ 
+        title: "Draft Saved", 
+        description: "Your content has been saved as a draft." 
+      });
+      
+      setGeneratedContent(null);
+      setFormData({
+        topic: "",
+        tone: "professional",
+        instructions: "",
+        includeHashtags: true,
+        postLength: "medium",
+      });
+      
+      const updatedDrafts = await getUserContents(user.uid, "draft");
+      setDrafts(updatedDrafts);
+    } catch (error) {
+      console.error("Error saving content:", error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save draft. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleFinalizeDraft = async (id: string) => {
-    await updateContentStatus(id, "final");
-    toast({ title: "Draft Finalized", description: "The draft is now marked as final." });
-    if (user) {
-      const drafts = await getUserContents(user.uid, "draft");
-      setDrafts(drafts);
+    if (!user) return;
+    
+    try {
+      await updateContentStatus(user.uid, id, "final");
+      toast({ 
+        title: "Draft Finalized", 
+        description: "The draft is now marked as final." 
+      });
+      
+      const updatedDrafts = await getUserContents(user.uid, "draft");
+      setDrafts(updatedDrafts);
+    } catch (error) {
+      console.error("Error finalizing draft:", error);
+      toast({
+        title: "Error",
+        description: "Failed to finalize draft. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

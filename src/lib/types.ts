@@ -1,4 +1,3 @@
-
 // Types for our LinkedIn content management app
 
 export interface ContentPost {
@@ -6,11 +5,14 @@ export interface ContentPost {
   title: string;
   content: string;
   hashtags?: string;
-  status: 'draft' | 'scheduled' | 'published';
+  status: 'draft' | 'scheduled' | 'published' | 'final';
+  topic?: string;
+  tone?: string;
   scheduledDate?: string;
   publishedDate?: string;
   createdAt: string;
   updatedAt: string;
+  userId: string;
 }
 
 export interface UserProfile {
