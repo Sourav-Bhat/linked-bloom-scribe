@@ -20,13 +20,13 @@ import { toast } from "@/components/ui/use-toast";
 import { UserProfile } from "@/lib/types";
 
 // Initial profile state matching our UserProfile type
-const initialProfile = {
+const initialProfile: Partial<UserProfile> = {
   full_name: "",
   industry: "",
   job_title: "",
-  topics: [] as string[],
+  topics: [],
   posts_per_week: 3,
-  tone: "professional" as const,
+  tone: "professional",
   company: "",
   bio: "",
 };
@@ -39,6 +39,7 @@ const llmProviderOptions = [
 const Profile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Partial<UserProfile>>(initialProfile);
+  const [topicsInput, setTopicsInput] = useState("");
 
   const [llmProvider, setLlmProvider] = useState("openai");
   const [llmApiKey, setLlmApiKey] = useState("");
@@ -50,12 +51,15 @@ const Profile = () => {
         try {
           const data = await getUserProfile(user.id);
           if (data) {
-            // Match the Supabase data structure to our component state
+            // Format topics as string for the input field
+            setTopicsInput(Array.isArray(data.topics) ? data.topics.join(", ") : "");
+            
+            // Cast tone to the expected union type if needed
+            const profileTone = data.tone as UserProfile["tone"] || "professional";
+            
             setProfile({
               ...data,
-              // Convert topics to string array if it's not already
-              topics: Array.isArray(data.topics) ? data.topics : 
-                     (data.topics ? data.topics.split(',').map(t => t.trim()) : [])
+              tone: profileTone
             });
           }
         } catch (error) {
@@ -80,25 +84,42 @@ const Profile = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setProfile(prev => ({ ...prev, [name]: value }));
+    
+    if (name === "topics") {
+      setTopicsInput(value);
+    } else {
+      setProfile(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setProfile(prev => ({ ...prev, [name]: value }));
+    if (name === "tone") {
+      // Ensure tone is properly typed as the union type
+      setProfile(prev => ({ 
+        ...prev, 
+        [name]: value as UserProfile["tone"] 
+      }));
+    } else if (name === "posts_per_week") {
+      // Convert posts_per_week to number
+      setProfile(prev => ({ 
+        ...prev, 
+        [name]: parseInt(value, 10) 
+      }));
+    } else {
+      setProfile(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     try {
-      // Convert topics to proper format if needed
-      const preparedProfile = {
+      // Convert topics from input string to array
+      const topicsArray = topicsInput.split(',').map(t => t.trim()).filter(t => t);
+      
+      const preparedProfile: Partial<UserProfile> = {
         ...profile,
-        id: user.id,
-        // Ensure topics is an array if coming from a string input
-        topics: typeof profile.topics === 'string' 
-          ? profile.topics.split(',').map(t => t.trim()) 
-          : profile.topics
+        topics: topicsArray,
       };
       
       await saveUserProfile(user.id, preparedProfile);
@@ -123,11 +144,11 @@ const Profile = () => {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="full_name">Full Name</Label>
               <Input 
-                id="name" 
-                name="name"
-                value={profile.name}
+                id="full_name" 
+                name="full_name"
+                value={profile.full_name || ""}
                 onChange={handleChange}
                 placeholder="Your name"
               />
@@ -138,18 +159,18 @@ const Profile = () => {
               <Input 
                 id="industry" 
                 name="industry"
-                value={profile.industry}
+                value={profile.industry || ""}
                 onChange={handleChange}
                 placeholder="Your industry"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="role">Professional Role</Label>
+              <Label htmlFor="job_title">Professional Role</Label>
               <Input 
-                id="role" 
-                name="role"
-                value={profile.role}
+                id="job_title" 
+                name="job_title"
+                value={profile.job_title || ""}
                 onChange={handleChange}
                 placeholder="Your current role"
               />
@@ -160,7 +181,7 @@ const Profile = () => {
               <Textarea
                 id="topics" 
                 name="topics"
-                value={profile.topics}
+                value={topicsInput}
                 onChange={handleChange}
                 placeholder="Topics you want to post about (comma separated)"
                 className="min-h-[100px]"
@@ -172,10 +193,10 @@ const Profile = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="postsPerWeek">Posts Per Week</Label>
+                <Label htmlFor="posts_per_week">Posts Per Week</Label>
                 <Select 
-                  value={profile.postsPerWeek}
-                  onValueChange={(value) => handleSelectChange("postsPerWeek", value)}
+                  value={profile.posts_per_week?.toString() || "3"}
+                  onValueChange={(value) => handleSelectChange("posts_per_week", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select frequency" />
@@ -196,7 +217,7 @@ const Profile = () => {
               <div className="space-y-2">
                 <Label htmlFor="tone">Content Tone</Label>
                 <Select 
-                  value={profile.tone}
+                  value={profile.tone || "professional"}
                   onValueChange={(value) => handleSelectChange("tone", value)}
                 >
                   <SelectTrigger>
