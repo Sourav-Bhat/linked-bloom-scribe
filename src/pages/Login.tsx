@@ -9,13 +9,15 @@ import { toast } from "@/components/ui/use-toast";
 import { signInWithEmail } from "@/services/authService";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("aabb@abc.com");  // Pre-filled for easier testing
+  const [password, setPassword] = useState("123456");   // Pre-filled for easier testing
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg("");
     try {
       setIsLoading(true);
       await signInWithEmail(email, password);
@@ -25,9 +27,20 @@ const Login = () => {
       });
       navigate("/profile");
     } catch (error) {
+      console.error("Login error:", error);
+      
+      // Check for specific error messages
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      if (errorMessage.includes("not configured") || errorMessage.includes("Email")) {
+        setErrorMsg("Email auth not configured. Try using the test account credentials below.");
+      } else {
+        setErrorMsg(errorMessage);
+      }
+      
       toast({
         title: "Sign in failed",
-        description: error instanceof Error ? error.message : "Please check your credentials and try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -45,6 +58,12 @@ const Login = () => {
 
         <form onSubmit={handleEmailSignIn}>
           <CardContent className="space-y-4">
+            {errorMsg && (
+              <div className="p-3 text-sm bg-red-50 border border-red-200 rounded-md text-red-600">
+                {errorMsg}
+              </div>
+            )}
+            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input 
@@ -71,8 +90,8 @@ const Login = () => {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
 
-            <div className="text-sm text-center text-gray-500 mt-4">
-              Test Account:<br />
+            <div className="text-sm text-center text-gray-500 mt-4 p-3 bg-gray-100 rounded-md">
+              <strong>Test Account:</strong><br />
               Email: aabb@abc.com<br />
               Password: 123456
             </div>

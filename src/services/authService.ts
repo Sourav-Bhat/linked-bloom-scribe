@@ -4,13 +4,18 @@ import { User } from '@supabase/supabase-js';
 
 // Sign in with email and password
 export const signInWithEmail = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  
-  if (error) throw error;
-  return data.user;
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) throw error;
+    return data.user;
+  } catch (error) {
+    console.error("Auth error during sign in:", error);
+    throw error;
+  }
 };
 
 // Register with email and password
@@ -45,4 +50,11 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return supabase.auth.onAuthStateChange((event, session) => {
     callback(session?.user ?? null);
   });
+};
+
+// Check if current user is authenticated
+export const getCurrentUser = async () => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return null;
+  return data.user;
 };
