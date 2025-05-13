@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -81,10 +82,10 @@ const Onboarding = () => {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="full_name">Full Name</Label>
               <Input
-                id="fullName"
-                name="fullName"
+                id="full_name"
+                name="full_name"
                 value={formData.full_name}
                 onChange={handleChange}
                 placeholder="John Doe"
@@ -93,10 +94,10 @@ const Onboarding = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="jobTitle">Job Title</Label>
+              <Label htmlFor="job_title">Job Title</Label>
               <Input
-                id="jobTitle"
-                name="jobTitle"
+                id="job_title"
+                name="job_title"
                 value={formData.job_title}
                 onChange={handleChange}
                 placeholder="Product Manager"
