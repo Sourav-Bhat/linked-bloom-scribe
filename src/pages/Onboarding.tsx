@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -56,8 +57,10 @@ const Onboarding = () => {
         description: "Welcome to LinkedIn Content Manager",
       });
       
-      // Navigate to the home page after successful submission
-      navigate("/");
+      console.log("Profile saved successfully, navigating to home page");
+      setTimeout(() => {
+        navigate("/");
+      }, 500);
     } catch (error) {
       console.error("Error saving profile:", error);
       toast({
