@@ -125,12 +125,7 @@ function addToRemoveQueue(toastId: string) {
   toastTimeouts.set(toastId, timeout)
 }
 
-interface ToasterToastProps extends ToastProps {
-  id: string
-  title?: React.ReactNode
-  description?: React.ReactNode
-  action?: ToastActionElement
-}
+// Removed the redundant ToasterToastProps interface that was causing the issue
 
 const listeners: ((state: State) => void)[] = []
 
