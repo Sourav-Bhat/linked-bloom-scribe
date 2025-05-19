@@ -16,6 +16,7 @@ import {
 import { saveGeneratedContent, getUserContents, updateContentStatus } from "@/services/contentService";
 import useAuth from "@/hooks/useAuth";
 import { ContentPost } from "@/lib/types";
+import { RefreshCw, Edit, Save } from "lucide-react";
 
 const Generator = () => {
   const { toast } = useToast();
@@ -30,6 +31,11 @@ const Generator = () => {
     includeHashtags: true,
     postLength: "medium",
   });
+  const [regeneratePrompt, setRegeneratePrompt] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState("");
+  const [editedContent, setEditedContent] = useState("");
+  const [editedHashtags, setEditedHashtags] = useState("");
 
   useEffect(() => {
     async function loadDrafts() {
@@ -97,9 +103,12 @@ What tools are you using to enhance your user research? I'd love to hear your ex
       };
 
       setGeneratedContent(generatedPost);
+      setEditedTitle(generatedPost.title || "");
+      setEditedContent(generatedPost.content || "");
+      setEditedHashtags(generatedPost.hashtags || "");
       toast({
         title: "Content Generated",
-        description: "Your LinkedIn post has been created. Don't forget to save it as a draft!",
+        description: "Your LinkedIn post has been created. You can edit it before saving.",
       });
     } catch (error) {
       console.error("Error generating content:", error);
@@ -112,13 +121,68 @@ What tools are you using to enhance your user research? I'd love to hear your ex
       setIsGenerating(false);
     }
   };
+  
+  const handleRegenerateContent = async () => {
+    if (!user) return;
+    
+    setIsGenerating(true);
+    try {
+      // In a real implementation, this would use the regeneratePrompt to
+      // create new content via an API call. For now, we'll simulate it.
+      const generatedPost: Partial<ContentPost> = {
+        title: "New Insights: " + formData.topic,
+        content: `Based on your request: "${regeneratePrompt}", here's a fresh perspective on ${formData.topic}.
+
+AI-driven research reveals that companies adopting sustainable practices see a 23% increase in customer loyalty. When we examine the data more carefully:
+
+1. Environmental initiatives correlate strongly with millennial and Gen-Z purchase decisions
+2. Transparent sustainability reporting increases trust by 37%
+3. Companies with clear climate commitments outperform peers in long-term growth
+
+The key takeaway? Sustainability isn't just good for the planet - it's becoming essential for business success.
+
+What sustainability practices have you implemented in your organization?`,
+        hashtags: "#Sustainability #BusinessStrategy #ClimateAction #Innovation #FutureOfBusiness",
+        status: "draft",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        user_id: user.id
+      };
+
+      setGeneratedContent(generatedPost);
+      setEditedTitle(generatedPost.title || "");
+      setEditedContent(generatedPost.content || "");
+      setEditedHashtags(generatedPost.hashtags || "");
+      setRegeneratePrompt("");
+      toast({
+        title: "Content Regenerated",
+        description: "Your LinkedIn post has been updated with fresh content.",
+      });
+    } catch (error) {
+      console.error("Error regenerating content:", error);
+      toast({
+        title: "Regeneration Failed",
+        description: "Failed to regenerate content. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleSaveContent = async () => {
     if (!user || !generatedContent) return;
     
     try {
-      await saveGeneratedContent(user.id, {
+      const contentToSave = isEditing ? {
         ...generatedContent,
+        title: editedTitle,
+        content: editedContent,
+        hashtags: editedHashtags
+      } : generatedContent;
+      
+      await saveGeneratedContent(user.id, {
+        ...contentToSave,
         topic: formData.topic,
         tone: formData.tone,
       });
@@ -129,6 +193,10 @@ What tools are you using to enhance your user research? I'd love to hear your ex
       });
       
       setGeneratedContent(null);
+      setEditedTitle("");
+      setEditedContent("");
+      setEditedHashtags("");
+      setIsEditing(false);
       setFormData({
         topic: "",
         tone: "professional",
@@ -179,6 +247,15 @@ What tools are you using to enhance your user research? I'd love to hear your ex
         variant: "destructive",
       });
     }
+  };
+
+  const toggleEditMode = () => {
+    if (!isEditing && generatedContent) {
+      setEditedTitle(generatedContent.title || "");
+      setEditedContent(generatedContent.content || "");
+      setEditedHashtags(generatedContent.hashtags || "");
+    }
+    setIsEditing(!isEditing);
   };
 
   return (
@@ -288,22 +365,92 @@ What tools are you using to enhance your user research? I'd love to hear your ex
               <CardHeader>
                 <CardTitle>Generated Post</CardTitle>
                 <CardDescription>Preview your LinkedIn post</CardDescription>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={toggleEditMode}
+                    className="flex items-center gap-1"
+                  >
+                    <Edit className="h-4 w-4" />
+                    {isEditing ? "View Preview" : "Edit Content"}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <h3 className="font-bold text-lg mb-2">{generatedContent.title}</h3>
-                  <div className="whitespace-pre-line text-gray-700">
-                    {generatedContent.content}
-                  </div>
-                  {formData.includeHashtags && (
-                    <div className="mt-4 text-blue-600">
-                      {generatedContent.hashtags}
+                {isEditing ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editTitle">Title</Label>
+                      <Input
+                        id="editTitle"
+                        value={editedTitle}
+                        onChange={(e) => setEditedTitle(e.target.value)}
+                      />
                     </div>
-                  )}
+                    <div className="space-y-2">
+                      <Label htmlFor="editContent">Content</Label>
+                      <Textarea
+                        id="editContent"
+                        value={editedContent}
+                        onChange={(e) => setEditedContent(e.target.value)}
+                        className="min-h-[250px]"
+                      />
+                    </div>
+                    {formData.includeHashtags && (
+                      <div className="space-y-2">
+                        <Label htmlFor="editHashtags">Hashtags</Label>
+                        <Input
+                          id="editHashtags"
+                          value={editedHashtags}
+                          onChange={(e) => setEditedHashtags(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="font-bold text-lg mb-2">{isEditing ? editedTitle : generatedContent.title}</h3>
+                    <div className="whitespace-pre-line text-gray-700">
+                      {isEditing ? editedContent : generatedContent.content}
+                    </div>
+                    {formData.includeHashtags && (
+                      <div className="mt-4 text-blue-600">
+                        {isEditing ? editedHashtags : generatedContent.hashtags}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="regeneratePrompt">Regenerate with additional instructions</Label>
+                    <div className="flex gap-2">
+                      <Textarea
+                        id="regeneratePrompt"
+                        value={regeneratePrompt}
+                        onChange={(e) => setRegeneratePrompt(e.target.value)}
+                        placeholder="Add instructions to refine the post..."
+                        className="flex-1"
+                      />
+                      <Button 
+                        variant="outline" 
+                        onClick={handleRegenerateContent}
+                        disabled={isGenerating || regeneratePrompt.trim() === ""}
+                        className="self-end"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Regenerate
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">
-                <Button variant="outline" onClick={handleSaveContent}>Save</Button>
+                <Button variant="outline" onClick={handleSaveContent} className="flex items-center gap-1">
+                  <Save className="h-4 w-4" />
+                  Save
+                </Button>
               </CardFooter>
             </Card>
           ) : (
