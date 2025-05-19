@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { signInWithEmail } from "@/services/authService";
+import { hasCompletedProfile } from "@/services/profileService";
 
 const Login = () => {
   const [email, setEmail] = useState("aabb@abc.com");  // Pre-filled for easier testing
@@ -20,12 +21,25 @@ const Login = () => {
     setErrorMsg("");
     try {
       setIsLoading(true);
-      await signInWithEmail(email, password);
+      const user = await signInWithEmail(email, password);
+      
       toast({
         title: "Signed in successfully",
         description: "Welcome back!",
       });
-      navigate("/profile");
+      
+      // Check if user has completed profile
+      if (user && user.id) {
+        const hasProfile = await hasCompletedProfile(user.id);
+        
+        if (hasProfile) {
+          navigate("/"); // Go to dashboard if profile is complete
+        } else {
+          navigate("/profile"); // Go to profile page if profile is incomplete
+        }
+      } else {
+        navigate("/profile"); // Default to profile for safety
+      }
     } catch (error) {
       console.error("Login error:", error);
       

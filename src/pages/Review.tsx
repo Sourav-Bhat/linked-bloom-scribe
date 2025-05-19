@@ -120,7 +120,9 @@ const Review = () => {
   
   // State for scheduling
   const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
+  const [isScheduleConfirming, setIsScheduleConfirming] = useState(false);
   
   // State for regeneration
   const [isRegeneratingOpen, setIsRegeneratingOpen] = useState(false);
@@ -130,6 +132,14 @@ const Review = () => {
   // State for version history
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (postData?.scheduledDate) {
+      const date = new Date(postData.scheduledDate);
+      setScheduledDate(date.toISOString().split('T')[0]);
+      setScheduledTime(date.toISOString().split('T')[1].substring(0, 5));
+    }
+  }, [postData]);
   
   if (!postData) {
     return (
@@ -177,6 +187,36 @@ const Review = () => {
   const handleCloseRegenerate = () => {
     setIsRegeneratingOpen(false);
     setRegeneratePrompt("");
+  };
+
+  const handleConfirmSchedule = () => {
+    if (!scheduledDate || !scheduledTime) {
+      toast({
+        title: "Schedule incomplete",
+        description: "Please select both a date and time for your post.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Combine date and time into a single Date object
+    const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+    
+    // In a real app, we would update the post in the database here
+    setPost(prev => ({
+      ...prev,
+      scheduledDate: scheduledDateTime.toISOString(),
+      status: 'scheduled'
+    }));
+    
+    toast({
+      title: "Post Scheduled!",
+      description: `Your LinkedIn post has been scheduled for ${formatScheduledDate(scheduledDateTime.toISOString())}.`,
+    });
+    
+    // Close scheduling panel and navigate to calendar
+    setIsScheduling(false);
+    navigate("/calendar");
   };
   
   const handleRegenerate = async () => {
@@ -344,7 +384,9 @@ const Review = () => {
                       <Input
                         id="scheduleDate"
                         type="date"
-                        defaultValue={new Date(post.scheduledDate).toISOString().split('T')[0]}
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        required
                       />
                     </div>
                   </div>
@@ -353,14 +395,17 @@ const Review = () => {
                     <Input
                       id="scheduleTime"
                       type="time"
-                      defaultValue={new Date(post.scheduledDate).toISOString().split('T')[1].substring(0, 5)}
+                      value={scheduledTime}
                       onChange={(e) => setScheduledTime(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full">Confirm Schedule</Button>
+                <Button className="w-full" onClick={handleConfirmSchedule}>
+                  Confirm Schedule
+                </Button>
               </CardFooter>
             </Card>
           )}
@@ -399,7 +444,12 @@ const Review = () => {
             <CardFooter className="flex flex-col items-start">
               <div className="flex items-center text-sm mb-2">
                 <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                <span>Scheduled for {formatScheduledDate(post.scheduledDate)}</span>
+                <span>
+                  {post.scheduledDate 
+                    ? `Scheduled for ${formatScheduledDate(post.scheduledDate)}`
+                    : 'Not scheduled yet'
+                  }
+                </span>
               </div>
               <div className="text-sm text-gray-500">
                 Expected engagement: High
