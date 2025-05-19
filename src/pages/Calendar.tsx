@@ -11,7 +11,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Edit, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from '@/integrations/supabase/client';
+import { ContentPost } from '@/lib/types';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useNavigate } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // Mock scheduled content data
 const initialScheduledContent = [
@@ -30,10 +61,14 @@ const initialScheduledContent = [
 ];
 
 const Calendar = () => {
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
-  const [scheduledContent] = useState(initialScheduledContent);
+  const [scheduledContent, setScheduledContent] = useState(initialScheduledContent);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
   
   // Filter posts for the selected date
   const postsForSelectedDate = scheduledContent.filter(post => {
@@ -52,6 +87,80 @@ const Calendar = () => {
   const handleDateSelect = (newDate: Date | undefined) => {
     setDate(newDate);
     setSelectedDate(newDate);
+  };
+
+  const handleEdit = (postId: string) => {
+    // Navigate to the post editor page with the post ID
+    navigate(`/review/${postId}`);
+  };
+
+  const confirmDelete = (postId: string) => {
+    setPostToDelete(postId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!postToDelete) return;
+    
+    try {
+      // In a real app, we would delete from Supabase
+      // const { error } = await supabase
+      //   .from('posts')
+      //   .delete()
+      //   .eq('id', postToDelete);
+      
+      // if (error) throw error;
+
+      // For mock data, filter out the deleted post
+      setScheduledContent(scheduledContent.filter(post => post.id !== postToDelete));
+      
+      toast({
+        title: "Post deleted",
+        description: "The post has been permanently deleted.",
+      });
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the post. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setPostToDelete(null);
+    }
+  };
+
+  const handleStatusChange = (postId: string, newStatus: 'draft' | 'scheduled') => {
+    // Update the status in the local state
+    setScheduledContent(content => 
+      content.map(post => 
+        post.id === postId 
+          ? { 
+              ...post, 
+              status: newStatus,
+              // If setting to scheduled and it's not already scheduled, set the date
+              date: newStatus === 'scheduled' && post.status !== 'scheduled' 
+                ? new Date(Date.now() + 24 * 60 * 60 * 1000) // Default to tomorrow
+                : post.date
+            } 
+          : post
+      )
+    );
+
+    // In a real app, we would update in Supabase
+    // const { error } = await supabase
+    //   .from('posts')
+    //   .update({ 
+    //     status: newStatus,
+    //     scheduled_date: newStatus === 'scheduled' ? new Date().toISOString() : null
+    //   })
+    //   .eq('id', postId);
+
+    toast({
+      title: `Post ${newStatus}`,
+      description: `The post has been ${newStatus === 'scheduled' ? 'scheduled for publication' : 'moved to drafts'}.`,
+    });
   };
 
   return (
@@ -122,13 +231,15 @@ const Calendar = () => {
                           {post.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
-                      <Badge variant={post.status === 'published' ? 'default' : 'outline'}>
-                        {post.status === 'draft' ? 'Draft' : 'Published'}
+                      <Badge variant={post.status === 'scheduled' ? 'default' : 'outline'}>
+                        {post.status === 'draft' ? 'Draft' : 'Scheduled'}
                       </Badge>
                     </div>
                     <div className="mt-3 flex gap-2">
-                      <Button size="sm" variant="outline">Edit</Button>
-                      <Button size="sm">Review</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(post.id)}>
+                        <Edit className="h-3 w-3 mr-1" /> Edit
+                      </Button>
+                      <Button size="sm" onClick={() => handleEdit(post.id)}>Review</Button>
                     </div>
                   </div>
                 ))}
@@ -150,40 +261,83 @@ const Calendar = () => {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="pb-2 font-medium">Post Title</th>
-                  <th className="pb-2 font-medium">Date</th>
-                  <th className="pb-2 font-medium">Time</th>
-                  <th className="pb-2 font-medium">Status</th>
-                  <th className="pb-2 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Post Title</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {scheduledContent.map(post => (
-                  <tr key={post.id} className="border-b">
-                    <td className="py-3">{post.title}</td>
-                    <td className="py-3">{post.date.toLocaleDateString()}</td>
-                    <td className="py-3">{post.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                    <td className="py-3">
-                      <Badge variant={post.status === 'published' ? 'default' : 'outline'}>
-                        {post.status === 'draft' ? 'Draft' : 'Published'}
+                  <TableRow key={post.id}>
+                    <TableCell>{post.title}</TableCell>
+                    <TableCell>{post.date.toLocaleDateString()}</TableCell>
+                    <TableCell>{post.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                    <TableCell>
+                      <Badge variant={post.status === 'scheduled' ? 'default' : 'outline'}>
+                        {post.status === 'draft' ? 'Draft' : 'Scheduled'}
                       </Badge>
-                    </td>
-                    <td className="py-3">
+                    </TableCell>
+                    <TableCell>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="ghost">Edit</Button>
-                        <Button size="sm" variant="ghost">Delete</Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(post.id)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => confirmDelete(post.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">Status</Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleStatusChange(post.id, 'draft')}
+                              disabled={post.status === 'draft'}
+                            >
+                              Set as Draft
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleStatusChange(post.id, 'scheduled')}
+                              disabled={post.status === 'scheduled'}
+                            >
+                              Schedule Post
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected post.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
