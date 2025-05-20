@@ -9,26 +9,26 @@ export interface ContentPost {
   status: 'draft' | 'scheduled' | 'published' | 'final';
   topic?: string;
   tone?: string;
-  instructions?: string; // Added instructions field
-  postLength?: 'short' | 'medium' | 'long'; // Added postLength field
-  versions?: Array<{date: string, content: string, hashtags?: string}>; // Added versions field
+  instructions?: string; // Instructions for content generation
+  postLength?: 'short' | 'medium' | 'long'; // Content length preference
+  versions?: Array<{date: string, content: string, hashtags?: string}>; // Version history
   scheduledDate?: string;
   publishedDate?: string;
-  created_at: string; // Changed from createdAt to match Supabase
-  updated_at: string; // Changed from updatedAt to match Supabase
-  user_id: string;    // Changed from userId to match Supabase
+  created_at: string; // Matches Supabase column name
+  updated_at: string; // Matches Supabase column name
+  user_id: string;    // Matches Supabase column name
 }
 
 export interface UserProfile {
   id: string;
-  full_name: string; // Changed to match Supabase column
+  full_name: string; // Matches Supabase column name
   industry: string;
-  job_title: string; // Changed from role to match Supabase
+  job_title: string; // Matches Supabase column name
   topics: string[]; 
-  posts_per_week: number; // Changed from postsPerWeek to match Supabase
+  posts_per_week: number; // Matches Supabase column name
   tone: 'professional' | 'friendly' | 'authoritative' | 'educational' | 'inspirational';
-  created_at: string; // Changed from createdAt to match Supabase
-  updated_at: string; // Changed from updatedAt to match Supabase
+  created_at: string; // Matches Supabase column name
+  updated_at: string; // Matches Supabase column name
   company?: string;
   bio?: string;
   onboarding_completed?: boolean;
@@ -45,4 +45,11 @@ export interface GenerationParams {
   instructions?: string;
   includeHashtags: boolean;
   postLength: 'short' | 'medium' | 'long';
+}
+
+// Type for API responses from external LLM services
+export interface LLMGenerationResponse {
+  title: string;
+  content: string;
+  hashtags?: string;
 }

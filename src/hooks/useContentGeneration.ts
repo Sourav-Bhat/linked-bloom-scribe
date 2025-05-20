@@ -1,0 +1,339 @@
+
+import { useState, useEffect } from 'react';
+import { useSearchParams } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { ContentPost, GenerationParams } from '@/lib/types';
+import { 
+  saveGeneratedContent, 
+  getContent, 
+  updateContent,
+  getUserContents
+} from '@/services/contentService';
+
+/**
+ * Custom hook for content generation functionality
+ */
+const useContentGeneration = (userId: string | undefined) => {
+  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const editPostId = searchParams.get('edit');
+
+  // Form and content states
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState<Partial<ContentPost> | null>(null);
+  const [drafts, setDrafts] = useState<ContentPost[]>([]);
+  const [formData, setFormData] = useState<GenerationParams>({
+    topic: "",
+    tone: "professional",
+    instructions: "",
+    includeHashtags: true,
+    postLength: "medium",
+  });
+  
+  // Edit states
+  const [regeneratePrompt, setRegeneratePrompt] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState("");
+  const [editedContent, setEditedContent] = useState("");
+  const [editedHashtags, setEditedHashtags] = useState("");
+  const [editMode, setEditMode] = useState(false);
+
+  // Load existing content if in edit mode
+  useEffect(() => {
+    async function loadEditContent() {
+      if (userId && editPostId) {
+        setIsLoading(true);
+        setEditMode(true);
+        try {
+          const postData = await getContent(userId, editPostId);
+          if (postData) {
+            // Create a type-safe version of the post data
+            const typedPostData: Partial<ContentPost> = {
+              ...postData,
+              status: postData.status as ContentPost['status']
+            };
+            
+            setGeneratedContent(typedPostData);
+            setEditedTitle(typedPostData.title || "");
+            setEditedContent(typedPostData.content || "");
+            setEditedHashtags(typedPostData.hashtags || "");
+            setFormData({
+              topic: typedPostData.topic || "",
+              tone: typedPostData.tone || "professional",
+              instructions: typedPostData.instructions || "",
+              includeHashtags: Boolean(typedPostData.hashtags),
+              postLength: typedPostData.postLength as "short" | "medium" | "long" || "medium",
+            });
+            setIsEditing(true);
+          }
+        } catch (error) {
+          console.error("Error loading post data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load post data. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    }
+    
+    loadEditContent();
+  }, [userId, editPostId, toast]);
+
+  // Load drafts
+  useEffect(() => {
+    async function loadDrafts() {
+      if (userId) {
+        try {
+          const userDrafts = await getUserContents(userId);
+          setDrafts(userDrafts);
+        } catch (error) {
+          console.error("Error loading drafts:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load drafts. Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
+    loadDrafts();
+  }, [userId, toast]);
+
+  // Form handlers
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: checked }));
+  };
+
+  // Submit handlers
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId) return;
+
+    setIsGenerating(true);
+    try {
+      // In a real implementation, this would call your LLM REST API
+      // For now we're using mock data
+      const generatedPost: Partial<ContentPost> = {
+        title: `Revolutionizing ${formData.topic} with AI-Powered Insights`,
+        content: `As professionals in ${formData.topic}, we're constantly seeking ways to innovate. I've recently integrated AI into our process, and the results have been eye-opening.
+
+Here's what we've learned:
+
+1. AI can analyze thousands of data points in minutes, revealing patterns humans might miss
+2. Sentiment analysis helps prioritize features based on emotional impact
+3. Predictive modeling allows us to test hypotheses without costly prototypes
+
+The most surprising insight? Users often don't explicitly state their most significant pain points - AI helps uncover these hidden frustrations.
+
+What tools are you using to enhance your ${formData.topic} strategy? I'd love to hear your experiences.`,
+        hashtags: formData.includeHashtags ? `#${formData.topic.replace(/\s+/g, '')} #AI #Innovation #DataDriven #FutureOfWork` : "",
+        status: "draft",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        user_id: userId,
+        topic: formData.topic,
+        tone: formData.tone,
+        instructions: formData.instructions,
+        postLength: formData.postLength as "short" | "medium" | "long"
+      };
+
+      setGeneratedContent(generatedPost);
+      setEditedTitle(generatedPost.title || "");
+      setEditedContent(generatedPost.content || "");
+      setEditedHashtags(generatedPost.hashtags || "");
+      toast({
+        title: "Content Generated",
+        description: "Your LinkedIn post has been created. You can edit it before saving.",
+      });
+    } catch (error) {
+      console.error("Error generating content:", error);
+      toast({
+        title: "Generation Failed",
+        description: "Failed to generate content. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  const handleRegenerateContent = async () => {
+    if (!userId) return;
+    
+    setIsGenerating(true);
+    try {
+      // Save current version before regenerating
+      const currentVersion = {
+        date: new Date().toISOString(),
+        content: isEditing ? editedContent : (generatedContent?.content || ""),
+        hashtags: isEditing ? editedHashtags : (generatedContent?.hashtags || ""),
+      };
+
+      // Get existing versions or create a new array
+      const existingVersions = generatedContent?.versions || [];
+
+      // In a real implementation, this would call your LLM REST API with the regeneration prompt
+      // For now we're using mock data
+      const regeneratedPost: Partial<ContentPost> = {
+        title: `New Insights: ${formData.topic}`,
+        content: `Based on your request: "${regeneratePrompt}", here's a fresh perspective on ${formData.topic}.
+
+AI-driven research reveals that companies focusing on innovation see a 23% increase in customer loyalty. When we examine the data more carefully:
+
+1. Strategic initiatives correlate strongly with millennial and Gen-Z engagement
+2. Transparent communication increases trust by 37%
+3. Companies with clear innovation roadmaps outperform peers in long-term growth
+
+The key takeaway? Strategic innovation isn't just good for the business - it's becoming essential for market leadership.
+
+What innovative practices have you implemented in your organization?`,
+        hashtags: formData.includeHashtags ? `#Innovation #${formData.topic.replace(/\s+/g, '')} #Leadership #Strategy #FutureOfBusiness` : "",
+        status: "draft",
+        updated_at: new Date().toISOString(),
+        user_id: userId,
+        topic: formData.topic,
+        tone: formData.tone,
+        instructions: regeneratePrompt,
+        versions: [...existingVersions, currentVersion]
+      };
+
+      setGeneratedContent(regeneratedPost);
+      setEditedTitle(regeneratedPost.title || "");
+      setEditedContent(regeneratedPost.content || "");
+      setEditedHashtags(regeneratedPost.hashtags || "");
+      setRegeneratePrompt("");
+      toast({
+        title: "Content Regenerated",
+        description: "Your post has been updated with the new instructions.",
+      });
+    } catch (error) {
+      console.error("Error regenerating content:", error);
+      toast({
+        title: "Regeneration Failed",
+        description: "Failed to regenerate content. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleSaveContent = async () => {
+    if (!userId || !generatedContent) return;
+    
+    try {
+      const contentToSave = isEditing ? {
+        ...generatedContent,
+        title: editedTitle,
+        content: editedContent,
+        hashtags: editedHashtags,
+        updated_at: new Date().toISOString(),
+        topic: formData.topic,
+        tone: formData.tone,
+        instructions: formData.instructions,
+        postLength: formData.postLength
+      } : {
+        ...generatedContent,
+        topic: formData.topic,
+        tone: formData.tone,
+        instructions: formData.instructions,
+        postLength: formData.postLength
+      };
+      
+      if (editMode && editPostId) {
+        // Update existing content
+        await updateContent(userId, editPostId, contentToSave);
+        
+        toast({ 
+          title: "Post Updated", 
+          description: "Your content has been updated successfully." 
+        });
+      } else {
+        // Save new content
+        await saveGeneratedContent(userId, contentToSave);
+        
+        toast({ 
+          title: "Draft Saved", 
+          description: "Your content has been saved as a draft." 
+        });
+      }
+      
+      // Reset state after saving
+      setGeneratedContent(null);
+      setEditedTitle("");
+      setEditedContent("");
+      setEditedHashtags("");
+      setIsEditing(false);
+      setEditMode(false);
+      setFormData({
+        topic: "",
+        tone: "professional",
+        instructions: "",
+        includeHashtags: true,
+        postLength: "medium",
+      });
+      
+      // Reload drafts
+      const updatedDrafts = await getUserContents(userId);
+      setDrafts(updatedDrafts);
+    } catch (error) {
+      console.error("Error saving content:", error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save draft. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // UI state handlers
+  const toggleEditMode = () => {
+    if (!isEditing && generatedContent) {
+      setEditedTitle(generatedContent.title || "");
+      setEditedContent(generatedContent.content || "");
+      setEditedHashtags(generatedContent.hashtags || "");
+    }
+    setIsEditing(!isEditing);
+  };
+
+  return {
+    isGenerating,
+    isLoading,
+    generatedContent,
+    drafts,
+    formData,
+    regeneratePrompt,
+    setRegeneratePrompt,
+    isEditing,
+    editedTitle,
+    setEditedTitle,
+    editedContent,
+    setEditedContent,
+    editedHashtags,
+    setEditedHashtags,
+    editMode,
+    handleChange,
+    handleSelectChange,
+    handleCheckboxChange,
+    handleSubmit,
+    handleRegenerateContent,
+    handleSaveContent,
+    toggleEditMode
+  };
+};
+
+export default useContentGeneration;
