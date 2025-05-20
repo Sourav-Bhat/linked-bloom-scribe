@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,16 +58,27 @@ const Generator = () => {
         try {
           const postData = await getContent(user.id, editPostId);
           if (postData) {
-            setGeneratedContent(postData);
-            setEditedTitle(postData.title || "");
-            setEditedContent(postData.content || "");
-            setEditedHashtags(postData.hashtags || "");
+            // Ensure the status is one of the allowed values
+            const safeStatus = ['draft', 'scheduled', 'published', 'final'].includes(postData.status) 
+              ? postData.status as ContentPost['status']
+              : 'draft';
+              
+            // Create a type-safe version of the post data
+            const typedPostData: Partial<ContentPost> = {
+              ...postData,
+              status: safeStatus
+            };
+            
+            setGeneratedContent(typedPostData);
+            setEditedTitle(typedPostData.title || "");
+            setEditedContent(typedPostData.content || "");
+            setEditedHashtags(typedPostData.hashtags || "");
             setFormData({
-              topic: postData.topic || "",
-              tone: postData.tone || "professional",
-              instructions: postData.instructions || "",
+              topic: typedPostData.topic || "",
+              tone: typedPostData.tone || "professional",
+              instructions: typedPostData.instructions || "",
               includeHashtags: true,
-              postLength: postData.postLength || "medium",
+              postLength: typedPostData.postLength as "short" | "medium" | "long" || "medium",
             });
             setIsEditing(true);
           }
@@ -94,11 +105,20 @@ const Generator = () => {
         try {
           const userDrafts = await getUserContents(user.id);
           // Convert the data to match our ContentPost type
-          const formattedDrafts = userDrafts.map((draft: any) => ({
-            ...draft,
-            scheduledDate: draft.scheduled_date,
-            publishedDate: draft.published_date
-          })) as ContentPost[];
+          const formattedDrafts = userDrafts.map((draft: any) => {
+            // Ensure status is a valid ContentPost status
+            const safeStatus = ['draft', 'scheduled', 'published', 'final'].includes(draft.status) 
+              ? draft.status 
+              : 'draft';
+              
+            return {
+              ...draft,
+              scheduledDate: draft.scheduled_date,
+              publishedDate: draft.published_date,
+              status: safeStatus
+            } as ContentPost;
+          });
+          
           setDrafts(formattedDrafts);
         } catch (error) {
           console.error("Error loading drafts:", error);
@@ -154,7 +174,7 @@ What tools are you using to enhance your user research? I'd love to hear your ex
         topic: formData.topic,
         tone: formData.tone,
         instructions: formData.instructions,
-        postLength: formData.postLength
+        postLength: formData.postLength as "short" | "medium" | "long"
       };
 
       setGeneratedContent(generatedPost);
@@ -189,6 +209,9 @@ What tools are you using to enhance your user research? I'd love to hear your ex
         hashtags: isEditing ? editedHashtags : (generatedContent?.hashtags || ""),
       };
 
+      // Get existing versions or create a new array
+      const existingVersions = generatedContent?.versions || [];
+
       // In a real app, this would use the regeneratePrompt with an AI API
       const regeneratedPost: Partial<ContentPost> = {
         title: `New Insights: ${formData.topic}`,
@@ -209,7 +232,7 @@ What sustainability practices have you implemented in your organization?`,
         user_id: user.id,
         topic: formData.topic,
         tone: formData.tone,
-        versions: generatedContent?.versions ? [...generatedContent.versions, currentVersion] : [currentVersion]
+        versions: [...existingVersions, currentVersion]
       };
 
       setGeneratedContent(regeneratedPost);

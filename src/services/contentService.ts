@@ -3,12 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { ContentPost } from '@/lib/types';
 
 export const saveGeneratedContent = async (userId: string, content: Partial<ContentPost>) => {
+  // Filter out properties that are not in the database schema
+  const { versions, instructions, postLength, ...dbContent } = content;
+  
   const { error } = await supabase
     .from('posts')
     .insert({
       user_id: userId,
-      ...content,
-      status: content.status || 'draft',
+      ...dbContent,
+      status: dbContent.status || 'draft',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     });
@@ -57,10 +60,13 @@ export const updateContentStatus = async (userId: string, postId: string, status
 };
 
 export const updateContent = async (userId: string, postId: string, data: Partial<ContentPost>) => {
+  // Filter out properties that are not in the database schema
+  const { versions, instructions, postLength, ...dbData } = data;
+  
   const { error } = await supabase
     .from('posts')
     .update({ 
-      ...data, 
+      ...dbData, 
       updated_at: new Date().toISOString() 
     })
     .eq('id', postId)

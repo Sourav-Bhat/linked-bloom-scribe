@@ -9,6 +9,9 @@ export interface ContentPost {
   status: 'draft' | 'scheduled' | 'published' | 'final';
   topic?: string;
   tone?: string;
+  instructions?: string; // Added instructions field
+  postLength?: 'short' | 'medium' | 'long'; // Added postLength field
+  versions?: Array<{date: string, content: string, hashtags?: string}>; // Added versions field
   scheduledDate?: string;
   publishedDate?: string;
   created_at: string; // Changed from createdAt to match Supabase
