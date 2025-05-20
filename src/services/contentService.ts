@@ -31,6 +31,18 @@ export const getUserContents = async (userId: string, status?: string) => {
   return data;
 };
 
+export const getContent = async (userId: string, postId: string) => {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('id', postId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+};
+
 export const updateContentStatus = async (userId: string, postId: string, status: string) => {
   const { error } = await supabase
     .from('posts')

@@ -7,9 +7,11 @@ import { Calendar as CalendarIcon, Edit, Clock } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import { getUserProfile } from "@/services/profileService";
 import { getUserContents } from "@/services/contentService";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -21,15 +23,20 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Load user profile - changed from user.uid to user.id
+        // Load user profile
         const profileData = await getUserProfile(user.id);
         setProfile(profileData);
         
-        // Load user content - changed from user.uid to user.id
+        // Load user content
         const postsData = await getUserContents(user.id);
         setPosts(postsData);
       } catch (error) {
         console.error("Error loading dashboard data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data. Please try again.",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -143,7 +150,12 @@ const Dashboard = () => {
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/review/${post.id}`}>Review</Link>
                       </Button>
-                      <Button variant="ghost" size="sm">Edit</Button>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to={`/generator?edit=${post.id}`}>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Link>
+                      </Button>
                     </td>
                   </tr>
                 ))

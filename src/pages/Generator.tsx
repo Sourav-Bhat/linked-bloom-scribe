@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,15 +14,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { saveGeneratedContent, getUserContents, updateContentStatus } from "@/services/contentService";
+import { 
+  saveGeneratedContent, 
+  getUserContents, 
+  updateContentStatus, 
+  getContent,
+  updateContent 
+} from "@/services/contentService";
 import useAuth from "@/hooks/useAuth";
 import { ContentPost } from "@/lib/types";
-import { RefreshCw, Edit, Save } from "lucide-react";
+import { RefreshCw, Edit, Save, Check } from "lucide-react";
 
 const Generator = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const editPostId = searchParams.get('edit');
+
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<Partial<ContentPost> | null>(null);
   const [drafts, setDrafts] = useState<ContentPost[]>([]);
   const [formData, setFormData] = useState({
@@ -36,7 +47,47 @@ const Generator = () => {
   const [editedTitle, setEditedTitle] = useState("");
   const [editedContent, setEditedContent] = useState("");
   const [editedHashtags, setEditedHashtags] = useState("");
+  const [editMode, setEditMode] = useState(false);
 
+  // Load existing content if in edit mode
+  useEffect(() => {
+    async function loadEditContent() {
+      if (user && editPostId) {
+        setIsLoading(true);
+        setEditMode(true);
+        try {
+          const postData = await getContent(user.id, editPostId);
+          if (postData) {
+            setGeneratedContent(postData);
+            setEditedTitle(postData.title || "");
+            setEditedContent(postData.content || "");
+            setEditedHashtags(postData.hashtags || "");
+            setFormData({
+              topic: postData.topic || "",
+              tone: postData.tone || "professional",
+              instructions: postData.instructions || "",
+              includeHashtags: true,
+              postLength: postData.postLength || "medium",
+            });
+            setIsEditing(true);
+          }
+        } catch (error) {
+          console.error("Error loading post data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load post data. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    }
+    
+    loadEditContent();
+  }, [user, editPostId]);
+
+  // Load drafts
   useEffect(() => {
     async function loadDrafts() {
       if (user) {
@@ -99,7 +150,11 @@ What tools are you using to enhance your user research? I'd love to hear your ex
         status: "draft",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        user_id: user.id
+        user_id: user.id,
+        topic: formData.topic,
+        tone: formData.tone,
+        instructions: formData.instructions,
+        postLength: formData.postLength
       };
 
       setGeneratedContent(generatedPost);
@@ -127,10 +182,16 @@ What tools are you using to enhance your user research? I'd love to hear your ex
     
     setIsGenerating(true);
     try {
-      // In a real implementation, this would use the regeneratePrompt to
-      // create new content via an API call. For now, we'll simulate it.
-      const generatedPost: Partial<ContentPost> = {
-        title: "New Insights: " + formData.topic,
+      // Save current version before regenerating
+      const currentVersion = {
+        date: new Date().toISOString(),
+        content: isEditing ? editedContent : (generatedContent?.content || ""),
+        hashtags: isEditing ? editedHashtags : (generatedContent?.hashtags || ""),
+      };
+
+      // In a real app, this would use the regeneratePrompt with an AI API
+      const regeneratedPost: Partial<ContentPost> = {
+        title: `New Insights: ${formData.topic}`,
         content: `Based on your request: "${regeneratePrompt}", here's a fresh perspective on ${formData.topic}.
 
 AI-driven research reveals that companies adopting sustainable practices see a 23% increase in customer loyalty. When we examine the data more carefully:
@@ -144,19 +205,21 @@ The key takeaway? Sustainability isn't just good for the planet - it's becoming 
 What sustainability practices have you implemented in your organization?`,
         hashtags: "#Sustainability #BusinessStrategy #ClimateAction #Innovation #FutureOfBusiness",
         status: "draft",
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        user_id: user.id
+        user_id: user.id,
+        topic: formData.topic,
+        tone: formData.tone,
+        versions: generatedContent?.versions ? [...generatedContent.versions, currentVersion] : [currentVersion]
       };
 
-      setGeneratedContent(generatedPost);
-      setEditedTitle(generatedPost.title || "");
-      setEditedContent(generatedPost.content || "");
-      setEditedHashtags(generatedPost.hashtags || "");
+      setGeneratedContent(regeneratedPost);
+      setEditedTitle(regeneratedPost.title || "");
+      setEditedContent(regeneratedPost.content || "");
+      setEditedHashtags(regeneratedPost.hashtags || "");
       setRegeneratePrompt("");
       toast({
         title: "Content Regenerated",
-        description: "Your LinkedIn post has been updated with fresh content.",
+        description: "Your post has been updated with the new instructions.",
       });
     } catch (error) {
       console.error("Error regenerating content:", error);
@@ -178,25 +241,42 @@ What sustainability practices have you implemented in your organization?`,
         ...generatedContent,
         title: editedTitle,
         content: editedContent,
-        hashtags: editedHashtags
+        hashtags: editedHashtags,
+        updated_at: new Date().toISOString()
       } : generatedContent;
       
-      await saveGeneratedContent(user.id, {
-        ...contentToSave,
-        topic: formData.topic,
-        tone: formData.tone,
-      });
-      
-      toast({ 
-        title: "Draft Saved", 
-        description: "Your content has been saved as a draft." 
-      });
+      if (editMode && editPostId) {
+        // Update existing content
+        await updateContent(user.id, editPostId, {
+          ...contentToSave,
+          topic: formData.topic,
+          tone: formData.tone,
+        });
+        
+        toast({ 
+          title: "Post Updated", 
+          description: "Your content has been updated successfully." 
+        });
+      } else {
+        // Save new content
+        await saveGeneratedContent(user.id, {
+          ...contentToSave,
+          topic: formData.topic,
+          tone: formData.tone,
+        });
+        
+        toast({ 
+          title: "Draft Saved", 
+          description: "Your content has been saved as a draft." 
+        });
+      }
       
       setGeneratedContent(null);
       setEditedTitle("");
       setEditedContent("");
       setEditedHashtags("");
       setIsEditing(false);
+      setEditMode(false);
       setFormData({
         topic: "",
         tone: "professional",
@@ -258,17 +338,25 @@ What sustainability practices have you implemented in your organization?`,
     setIsEditing(!isEditing);
   };
 
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-64">Loading post data...</div>;
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Content Generator</h1>
+      <h1 className="text-3xl font-bold">
+        {editMode ? "Edit LinkedIn Post" : "Content Generator"}
+      </h1>
       
       <div className="grid md:grid-cols-2 gap-6">
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>Create New LinkedIn Post</CardTitle>
+              <CardTitle>{editMode ? "Edit Post" : "Create New LinkedIn Post"}</CardTitle>
               <CardDescription>
-                Generate a professional LinkedIn post based on your specifications
+                {editMode 
+                  ? "Modify your existing LinkedIn post" 
+                  : "Generate a professional LinkedIn post based on your specifications"}
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit}>
@@ -351,9 +439,15 @@ What sustainability practices have you implemented in your organization?`,
               </CardContent>
               
               <CardFooter>
-                <Button type="submit" disabled={isGenerating} className="w-full">
-                  {isGenerating ? "Generating..." : "Generate Post"}
-                </Button>
+                {!editMode ? (
+                  <Button type="submit" disabled={isGenerating} className="w-full">
+                    {isGenerating ? "Generating..." : "Generate Post"}
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={handleSaveContent} className="w-full">
+                    <Save className="mr-2 h-4 w-4" /> Update Post
+                  </Button>
+                )}
               </CardFooter>
             </form>
           </Card>
@@ -363,8 +457,12 @@ What sustainability practices have you implemented in your organization?`,
           {generatedContent ? (
             <Card>
               <CardHeader>
-                <CardTitle>Generated Post</CardTitle>
-                <CardDescription>Preview your LinkedIn post</CardDescription>
+                <CardTitle>
+                  {editMode ? "Edit Post" : "Generated Post"}
+                </CardTitle>
+                <CardDescription>
+                  {editMode ? "Review and edit your content" : "Preview your LinkedIn post"}
+                </CardDescription>
                 <div className="flex gap-2 mt-2">
                   <Button 
                     variant="outline" 
@@ -372,8 +470,17 @@ What sustainability practices have you implemented in your organization?`,
                     onClick={toggleEditMode}
                     className="flex items-center gap-1"
                   >
-                    <Edit className="h-4 w-4" />
-                    {isEditing ? "View Preview" : "Edit Content"}
+                    {isEditing ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        View Preview
+                      </>
+                    ) : (
+                      <>
+                        <Edit className="h-4 w-4" />
+                        Edit Content
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardHeader>
@@ -447,9 +554,13 @@ What sustainability practices have you implemented in your organization?`,
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">
-                <Button variant="outline" onClick={handleSaveContent} className="flex items-center gap-1">
+                <Button 
+                  variant="outline" 
+                  onClick={handleSaveContent} 
+                  className="flex items-center gap-1"
+                >
                   <Save className="h-4 w-4" />
-                  Save
+                  {editMode ? "Update" : "Save"}
                 </Button>
               </CardFooter>
             </Card>
@@ -466,7 +577,22 @@ What sustainability practices have you implemented in your organization?`,
                       <li key={draft.id} className="border rounded px-3 py-2 flex justify-between items-center">
                         <span>{draft.title || draft.topic}</span>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleFinalizeDraft(draft.id)}>Finalize</Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleFinalizeDraft(draft.id)}
+                          >
+                            Finalize
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            asChild
+                          >
+                            <Link to={`/generator?edit=${draft.id}`}>
+                              <Edit className="h-3 w-3" />
+                            </Link>
+                          </Button>
                         </div>
                       </li>
                     ))}
