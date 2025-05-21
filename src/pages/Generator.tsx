@@ -9,6 +9,7 @@ import ContentForm from "@/components/generator/ContentForm";
 import ContentPreview from "@/components/generator/ContentPreview";
 import DraftsList from "@/components/generator/DraftsList";
 import useContentGeneration from "@/hooks/useContentGeneration";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * Generator page for creating LinkedIn content posts
@@ -17,6 +18,7 @@ import useContentGeneration from "@/hooks/useContentGeneration";
 const Generator = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   // Use custom hook for content generation functionality
   const {
@@ -77,7 +79,7 @@ const Generator = () => {
         {editMode ? "Edit LinkedIn Post" : "Content Generator"}
       </h1>
       
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <ContentForm
             formData={formData}

@@ -71,11 +71,11 @@ const ContentForm: React.FC<ContentFormProps> = ({
               value={formData.instructions || ''}
               onChange={handleChange}
               placeholder="Any specific points you'd like to include..."
-              className="min-h-[100px]"
+              className="min-h-[100px] max-h-[200px]"
             />
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tone">Content Tone</Label>
               <Select
@@ -85,7 +85,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
                 <SelectTrigger>
                   <SelectValue placeholder="Select tone" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50">
                   <SelectItem value="professional">Professional</SelectItem>
                   <SelectItem value="friendly">Friendly</SelectItem>
                   <SelectItem value="authoritative">Authoritative</SelectItem>
@@ -104,7 +104,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
                 <SelectTrigger>
                   <SelectValue placeholder="Select length" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50">
                   <SelectItem value="short">Short (50-100 words)</SelectItem>
                   <SelectItem value="medium">Medium (100-200 words)</SelectItem>
                   <SelectItem value="long">Long (200-300 words)</SelectItem>

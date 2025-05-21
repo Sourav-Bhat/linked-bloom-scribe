@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,13 +53,8 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          {editMode ? "Edit Post" : "Generated Post"}
-        </CardTitle>
-        <CardDescription>
-          {editMode ? "Review and edit your content" : "Preview your LinkedIn post"}
-        </CardDescription>
-        <div className="flex gap-2 mt-2">
+        <CardTitle className="flex items-center justify-between">
+          <span>{editMode ? "Edit Post" : "Generated Post"}</span>
           <Button 
             variant="outline" 
             size="sm" 
@@ -69,16 +64,19 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
             {isEditing ? (
               <>
                 <Check className="h-4 w-4" />
-                View Preview
+                <span className="hidden sm:inline">View Preview</span>
               </>
             ) : (
               <>
                 <Edit className="h-4 w-4" />
-                Edit Content
+                <span className="hidden sm:inline">Edit Content</span>
               </>
             )}
           </Button>
-        </div>
+        </CardTitle>
+        <CardDescription>
+          {editMode ? "Review and edit your content" : "Preview your LinkedIn post"}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {isEditing ? (
@@ -97,7 +95,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
                 id="editContent"
                 value={editedContent}
                 onChange={(e) => setEditedContent(e.target.value)}
-                className="min-h-[250px]"
+                className="min-h-[150px] sm:min-h-[250px]"
               />
             </div>
             {includeHashtags && (
@@ -114,7 +112,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
         ) : (
           <div>
             <h3 className="font-bold text-lg mb-2">{isEditing ? editedTitle : generatedContent.title}</h3>
-            <div className="whitespace-pre-line text-gray-700">
+            <div className="whitespace-pre-line text-gray-700 max-h-[300px] overflow-y-auto">
               {isEditing ? editedContent : generatedContent.content}
             </div>
             {includeHashtags && (
@@ -128,7 +126,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
         <div className="space-y-4 pt-4 border-t">
           <div className="space-y-2">
             <Label htmlFor="regeneratePrompt">Regenerate with additional instructions</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Textarea
                 id="regeneratePrompt"
                 value={regeneratePrompt}
@@ -140,7 +138,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
                 variant="outline" 
                 onClick={handleRegenerateContent}
                 disabled={isGenerating || regeneratePrompt.trim() === ""}
-                className="self-end"
+                className="self-end whitespace-nowrap"
               >
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Regenerate
@@ -153,7 +151,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
         <Button 
           variant="outline" 
           onClick={handleSaveContent} 
-          className="flex items-center gap-1"
+          className="flex items-center gap-1 w-full sm:w-auto"
         >
           <Save className="h-4 w-4" />
           {editMode ? "Update" : "Save"}
