@@ -1,5 +1,6 @@
 
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import useAuth from "@/hooks/useAuth";
 import { updateContentStatus } from "@/services/contentService";
