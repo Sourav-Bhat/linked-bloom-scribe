@@ -5,7 +5,7 @@ import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Layout = () => {
@@ -28,15 +28,23 @@ const Layout = () => {
             className="absolute top-2 left-2 z-20 md:hidden"
             onClick={toggleSidebar}
           >
-            <Menu className="h-5 w-5" />
+            {showMobileSidebar ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
         )}
         
-        {/* Sidebar - hidden on mobile by default */}
+        {/* Mobile backdrop */}
+        {isMobile && showMobileSidebar && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
+            onClick={() => setShowMobileSidebar(false)}
+          />
+        )}
+        
+        {/* Sidebar */}
         <div 
           className={`${
             isMobile 
-              ? `fixed inset-y-0 left-0 z-10 transform ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-200 ease-in-out`
+              ? `fixed inset-y-0 left-0 z-20 transform ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-200 ease-in-out md:relative md:translate-x-0`
               : 'relative'
           }`}
         >

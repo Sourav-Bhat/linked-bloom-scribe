@@ -1,8 +1,10 @@
+
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Calendar as CalendarIcon, Home, Settings, Edit, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/services/authService";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const menuItems = [{
   name: "Dashboard",
@@ -25,6 +27,8 @@ const menuItems = [{
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const handleLogout = async () => {
     try {
@@ -42,7 +46,11 @@ const Sidebar = () => {
     }
   };
 
-  return <aside className="w-64 min-h-screen bg-white border-r border-gray-200 hidden md:block relative">
+  return (
+    <aside className={cn(
+      "w-64 min-h-screen bg-white border-r border-gray-200 relative",
+      isMobile ? "block" : "hidden md:block"
+    )}>
       <div className="flex justify-center mt-6 mb-6">
         <div className="h-10 w-10 rounded-full bg-linkedin-blue flex items-center justify-center text-white font-bold">
           LCM
@@ -50,12 +58,20 @@ const Sidebar = () => {
       </div>
       <nav className="mt-5">
         <ul className="space-y-1 px-2">
-          {menuItems.map(item => <li key={item.name}>
-              <Link to={item.path} className={cn("flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-linkedin-lightblue hover:text-linkedin-blue", location.pathname === item.path && "bg-linkedin-lightblue text-linkedin-blue")}>
+          {menuItems.map(item => (
+            <li key={item.name}>
+              <Link 
+                to={item.path} 
+                className={cn(
+                  "flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-linkedin-lightblue hover:text-linkedin-blue",
+                  location.pathname === item.path && "bg-linkedin-lightblue text-linkedin-blue"
+                )}
+              >
                 <item.icon className="h-5 w-5 mr-3" />
                 {item.name}
               </Link>
-            </li>)}
+            </li>
+          ))}
         </ul>
       </nav>
       
@@ -80,7 +96,8 @@ const Sidebar = () => {
           </button>
         </div>
       </div>
-    </aside>;
+    </aside>
+  );
 };
 
 export default Sidebar;

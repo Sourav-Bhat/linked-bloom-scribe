@@ -17,7 +17,14 @@ import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Layout from "./components/Layout";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export const AuthContext = createContext<{user: User | null}>({user: null});
 
@@ -27,27 +34,48 @@ const App = () => {
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+        
+        console.log('Auth state changed:', event, session?.user?.id);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          const { data } = await supabase
-            .from('profiles')
-            .select('onboarding_completed')
-            .eq('id', session.user.id)
-            .single();
-            
-          setOnboardingCompleted(data?.onboarding_completed ?? false);
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('onboarding_completed')
+              .eq('id', session.user.id)
+              .single();
+              
+            if (mounted) {
+              setOnboardingCompleted(data?.onboarding_completed ?? false);
+            }
+          } catch (error) {
+            console.error('Error fetching profile:', error);
+            if (mounted) {
+              setOnboardingCompleted(false);
+            }
+          }
         } else {
-          setOnboardingCompleted(null);
+          if (mounted) {
+            setOnboardingCompleted(null);
+          }
         }
         
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     );
 
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
       setUser(session?.user ?? null);
       
       if (session?.user) {
@@ -57,21 +85,39 @@ const App = () => {
           .eq('id', session.user.id)
           .single()
           .then(({ data }) => {
-            setOnboardingCompleted(data?.onboarding_completed ?? false);
-            setLoading(false);
+            if (mounted) {
+              setOnboardingCompleted(data?.onboarding_completed ?? false);
+              setLoading(false);
+            }
+          })
+          .catch(() => {
+            if (mounted) {
+              setOnboardingCompleted(false);
+              setLoading(false);
+            }
           });
       } else {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-linkedin-blue mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
