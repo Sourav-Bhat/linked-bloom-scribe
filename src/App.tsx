@@ -72,36 +72,56 @@ const App = () => {
       }
     );
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Get initial session with proper error handling
+    const getInitialSession = async () => {
       if (!mounted) return;
       
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        supabase
-          .from('profiles')
-          .select('onboarding_completed')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
+        
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('onboarding_completed')
+              .eq('id', session.user.id)
+              .single();
+              
             if (mounted) {
               setOnboardingCompleted(data?.onboarding_completed ?? false);
               setLoading(false);
             }
-          })
-          .catch(() => {
+          } catch (profileError) {
+            console.error('Error fetching profile:', profileError);
             if (mounted) {
               setOnboardingCompleted(false);
               setLoading(false);
             }
-          });
-      } else {
+          }
+        } else {
+          if (mounted) {
+            setLoading(false);
+          }
+        }
+      } catch (sessionError) {
+        console.error('Error in getInitialSession:', sessionError);
         if (mounted) {
           setLoading(false);
         }
       }
-    });
+    };
+
+    getInitialSession();
 
     return () => {
       mounted = false;
