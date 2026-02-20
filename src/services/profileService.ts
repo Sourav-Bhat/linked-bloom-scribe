@@ -49,12 +49,11 @@ export const checkUserCollections = async (userId: string) => {
 export const hasCompletedProfile = async (userId: string) => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('full_name, industry, job_title')
+    .select('full_name')
     .eq('id', userId)
     .maybeSingle();
     
-  if (error) throw error;
+  if (error) return false;
   
-  // Check if basic profile details are filled
-  return !!(data?.full_name && data?.industry && data?.job_title);
+  return !!data?.full_name;
 };

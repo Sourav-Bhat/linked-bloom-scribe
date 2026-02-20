@@ -125,7 +125,7 @@ const Login = () => {
     
     // Simple connection test
     try {
-      const response = await fetch('https://maagbeaeenzglbdoknmk.supabase.co/rest/v1/', {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, {
         method: 'HEAD',
         mode: 'no-cors'
       });
