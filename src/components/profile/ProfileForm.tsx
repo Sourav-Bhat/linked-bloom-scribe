@@ -1,195 +1,495 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { saveUserProfile } from "@/services/profileService";
 import { toast } from "@/components/ui/use-toast";
-import { UserProfile } from "@/lib/types";
+import { supabase } from "@/integrations/supabase/client";
+import { Plus, X } from "lucide-react";
+
+interface AdmiredPost {
+  url: string;
+  standout: string;
+}
+
+interface PersonaData {
+  industry: string;
+  experience_range: string;
+  location: string;
+  future_goal: string;
+  topics: string[];
+  admired_posts: AdmiredPost[];
+  no_go_topic: string;
+  posts_per_week: number | null;
+  preferred_days: string[];
+  tone: string;
+  archetype: string;
+}
 
 interface ProfileFormProps {
-  profile: Partial<UserProfile>;
-  setProfile: React.Dispatch<React.SetStateAction<Partial<UserProfile>>>;
+  profile: any;
+  setProfile: any;
   topicsInput: string;
-  setTopicsInput: React.Dispatch<React.SetStateAction<string>>;
+  setTopicsInput: any;
   isNewProfile: boolean;
   userId: string;
 }
 
+const INDUSTRIES = [
+  "Technology", "Finance", "Marketing", "Consulting", "Healthcare",
+  "Education", "Legal", "Real Estate", "Retail", "Manufacturing", "Media", "Other",
+];
+
+const EXPERIENCE_OPTIONS = [
+  { value: "0-3", label: "0-3 years" },
+  { value: "4-7", label: "4-7 years" },
+  { value: "8-15", label: "8-15 years" },
+  { value: "15+", label: "15+ years" },
+];
+
+const ALL_TOPICS = [
+  "Leadership", "Career Growth", "Industry Trends", "Personal Lessons",
+  "Team Culture", "Innovation", "Hiring and Talent", "Client Work",
+  "Entrepreneurship", "Productivity", "Diversity and Inclusion", "Future of Work",
+];
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+const POSTS_OPTIONS = [
+  { value: 1, label: "1 post", desc: "Slow and steady, low commitment" },
+  { value: 2, label: "2 posts", desc: "Recommended for steady growth" },
+  { value: 3, label: "3 posts", desc: "Ambitious, high visibility" },
+];
+
+const TONE_OPTIONS = [
+  { value: "professional", label: "Professional", desc: "Structured, authoritative, data-informed" },
+  { value: "conversational", label: "Conversational", desc: "Approachable, direct, like talking to a peer" },
+  { value: "storytelling", label: "Storytelling", desc: "Narrative-driven, personal, experience-based" },
+];
+
+const STANDOUT_OPTIONS = [
+  "Sharp and direct", "Honest and vulnerable", "Data-driven",
+  "Inspiring", "Contrarian", "Storytelling", "Practical advice",
+];
+
 export const ProfileForm = ({
-  profile,
-  setProfile,
-  topicsInput,
-  setTopicsInput,
-  isNewProfile,
-  userId
+  userId,
 }: ProfileFormProps) => {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    
-    if (name === "topics") {
-      setTopicsInput(value);
-    } else {
-      setProfile(prev => ({ ...prev, [name]: value }));
+  const [persona, setPersona] = useState<PersonaData>({
+    industry: "",
+    experience_range: "",
+    location: "",
+    future_goal: "",
+    topics: [],
+    admired_posts: [{ url: "", standout: "" }],
+    no_go_topic: "",
+    posts_per_week: null,
+    preferred_days: [],
+    tone: "",
+    archetype: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function loadPersona() {
+      try {
+        const { data, error } = await (supabase
+          .from("personas" as any) as any)
+          .select("*")
+          .eq("user_id", userId)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setPersona({
+            industry: data.industry || "",
+            experience_range: data.experience_range || "",
+            location: data.location || "",
+            future_goal: data.future_goal || "",
+            topics: data.topics || [],
+            admired_posts: (data.admired_posts as AdmiredPost[])?.length
+              ? (data.admired_posts as AdmiredPost[])
+              : [{ url: "", standout: "" }],
+            no_go_topic: data.no_go_topic || "",
+            posts_per_week: data.posts_per_week,
+            preferred_days: data.preferred_days || [],
+            tone: data.tone || "",
+            archetype: data.archetype || "",
+          });
+        }
+      } catch (error) {
+        console.error("Error loading persona:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPersona();
+  }, [userId]);
+
+  const toggleTopic = (topic: string) => {
+    setPersona((prev) => {
+      const current = prev.topics;
+      if (current.includes(topic)) {
+        return { ...prev, topics: current.filter((t) => t !== topic) };
+      } else if (current.length < 5) {
+        return { ...prev, topics: [...current, topic] };
+      }
+      return prev;
+    });
+  };
+
+  const toggleDay = (day: string) => {
+    setPersona((prev) => {
+      const current = prev.preferred_days;
+      if (current.includes(day)) {
+        return { ...prev, preferred_days: current.filter((d) => d !== day) };
+      } else if (current.length < 4) {
+        return { ...prev, preferred_days: [...current, day] };
+      }
+      return prev;
+    });
+  };
+
+  const updatePost = (index: number, field: keyof AdmiredPost, value: string) => {
+    setPersona((prev) => {
+      const posts = [...prev.admired_posts];
+      posts[index] = { ...posts[index], [field]: value };
+      return { ...prev, admired_posts: posts };
+    });
+  };
+
+  const addPost = () => {
+    if (persona.admired_posts.length < 3) {
+      setPersona((prev) => ({
+        ...prev,
+        admired_posts: [...prev.admired_posts, { url: "", standout: "" }],
+      }));
     }
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    if (name === "tone") {
-      // Ensure tone is properly typed as the union type
-      setProfile(prev => ({ 
-        ...prev, 
-        [name]: value as UserProfile["tone"] 
-      }));
-    } else if (name === "posts_per_week") {
-      // Convert posts_per_week to number
-      setProfile(prev => ({ 
-        ...prev, 
-        [name]: parseInt(value, 10) 
-      }));
-    } else {
-      setProfile(prev => ({ ...prev, [name]: value }));
-    }
+  const removePost = (index: number) => {
+    setPersona((prev) => ({
+      ...prev,
+      admired_posts: prev.admired_posts.filter((_, i) => i !== index),
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
-      // Convert topics from input string to array
-      const topicsArray = topicsInput.split(',').map(t => t.trim()).filter(t => t);
-      
-      const preparedProfile: Partial<UserProfile> = {
-        ...profile,
-        topics: topicsArray,
-      };
-      
-      await saveUserProfile(userId, preparedProfile);
-      toast({ title: "Profile updated!", description: "Your preferences have been saved." });
+      const { error } = await (supabase
+        .from("personas" as any) as any)
+        .upsert({
+          user_id: userId,
+          industry: persona.industry,
+          experience_range: persona.experience_range,
+          location: persona.location,
+          future_goal: persona.future_goal,
+          topics: persona.topics,
+          admired_posts: persona.admired_posts.filter((p) => p.url.trim()),
+          no_go_topic: persona.no_go_topic,
+          posts_per_week: persona.posts_per_week,
+          preferred_days: persona.preferred_days,
+          tone: persona.tone,
+          archetype: persona.archetype,
+        }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      // Also sync key fields to profiles
+      await supabase
+        .from("profiles")
+        .update({
+          industry: persona.industry,
+          topics: persona.topics,
+          posts_per_week: persona.posts_per_week,
+          tone: persona.tone,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+
+      toast({ title: "Profile updated!", description: "Your content persona has been saved." });
     } catch (err) {
-      toast({ title: "Profile save failed", description: "Please try again.", variant: "destructive" });
+      console.error("Error saving persona:", err);
+      toast({ title: "Save failed", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          Loading your profile...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const charCount = persona.future_goal.length;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile Information</CardTitle>
+        <CardTitle>Content Profile</CardTitle>
         <CardDescription>
-          Customize how your content is generated based on your professional profile.
+          Update your content persona — these settings shape how your posts are generated.
         </CardDescription>
       </CardHeader>
-      
+
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="full_name">Full Name</Label>
-            <Input 
-              id="full_name" 
-              name="full_name"
-              value={profile.full_name || ""}
-              onChange={handleChange}
-              placeholder="Your name"
-            />
-          </div>
+        <CardContent className="space-y-8">
+          {/* === Section 1: Professional Background === */}
+          <div className="space-y-5">
+            <h3 className="text-lg font-semibold text-foreground">Professional Background</h3>
 
-          <div className="space-y-2">
-            <Label htmlFor="industry">Industry</Label>
-            <Input 
-              id="industry" 
-              name="industry"
-              value={profile.industry || ""}
-              onChange={handleChange}
-              placeholder="Your industry"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="job_title">Professional Role</Label>
-            <Input 
-              id="job_title" 
-              name="job_title"
-              value={profile.job_title || ""}
-              onChange={handleChange}
-              placeholder="Your current role"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="topics">Topics of Interest</Label>
-            <Textarea
-              id="topics" 
-              name="topics"
-              value={topicsInput}
-              onChange={handleChange}
-              placeholder="Topics you want to post about (comma separated)"
-              className="min-h-[100px]"
-            />
-            <p className="text-sm text-muted-foreground">
-              Enter topics separated by commas that you want to focus on in your content
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="posts_per_week">Posts Per Week</Label>
-              <Select 
-                value={profile.posts_per_week?.toString() || "3"}
-                onValueChange={(value) => handleSelectChange("posts_per_week", value)}
+              <Label htmlFor="industry">Industry</Label>
+              <Select
+                value={persona.industry}
+                onValueChange={(val) => setPersona((p) => ({ ...p, industry: val }))}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select frequency" />
+                <SelectTrigger id="industry">
+                  <SelectValue placeholder="Select your industry" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Posting Frequency</SelectLabel>
-                    <SelectItem value="1">1 post / week</SelectItem>
-                    <SelectItem value="2">2 posts / week</SelectItem>
-                    <SelectItem value="3">3 posts / week</SelectItem>
-                    <SelectItem value="5">5 posts / week</SelectItem>
-                    <SelectItem value="7">7 posts / week</SelectItem>
-                  </SelectGroup>
+                  {INDUSTRIES.map((i) => (
+                    <SelectItem key={i} value={i.toLowerCase().replace(/\s+/g, "-")}>{i}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="tone">Content Tone</Label>
-              <Select 
-                value={profile.tone || "professional"}
-                onValueChange={(value) => handleSelectChange("tone", value)}
+            <div className="space-y-3">
+              <Label>Years of Experience</Label>
+              <RadioGroup
+                value={persona.experience_range}
+                onValueChange={(val) => setPersona((p) => ({ ...p, experience_range: val }))}
+                className="flex flex-wrap gap-3"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select tone" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Tone</SelectLabel>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="friendly">Friendly</SelectItem>
-                    <SelectItem value="authoritative">Authoritative</SelectItem>
-                    <SelectItem value="educational">Educational</SelectItem>
-                    <SelectItem value="inspirational">Inspirational</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                {EXPERIENCE_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-md border cursor-pointer transition-colors ${
+                      persona.experience_range === opt.value
+                        ? "border-primary bg-primary/5"
+                        : "border-input hover:border-primary/40"
+                    }`}
+                  >
+                    <RadioGroupItem value={opt.value} />
+                    <span className="text-sm">{opt.label}</span>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={persona.location}
+                onChange={(e) => setPersona((p) => ({ ...p, location: e.target.value }))}
+                placeholder="City, Country — e.g. Dubai, UAE"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="futureGoal">Where do you want to be professionally in 2 years?</Label>
+              <Textarea
+                id="futureGoal"
+                value={persona.future_goal}
+                onChange={(e) => {
+                  if (e.target.value.length <= 150) {
+                    setPersona((p) => ({ ...p, future_goal: e.target.value }));
+                  }
+                }}
+                placeholder="e.g. Move into a VP role, launch my own consultancy"
+                className="min-h-[80px]"
+              />
+              <p className={`text-xs text-right ${charCount >= 150 ? "text-destructive" : "text-muted-foreground"}`}>
+                {charCount}/150
+              </p>
+            </div>
+          </div>
+
+          {/* === Section 2: Content Preferences === */}
+          <div className="space-y-5">
+            <h3 className="text-lg font-semibold text-foreground">Content Preferences</h3>
+
+            <div className="space-y-3">
+              <Label>Content Topics (select 3 to 5)</Label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_TOPICS.map((topic) => {
+                  const selected = persona.topics.includes(topic);
+                  return (
+                    <button
+                      key={topic}
+                      type="button"
+                      onClick={() => toggleTopic(topic)}
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                        selected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-input text-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {topic}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Admired LinkedIn Posts</Label>
+              {persona.admired_posts.map((post, idx) => (
+                <div key={idx} className="p-4 rounded-lg border border-input bg-background space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Input
+                      value={post.url}
+                      onChange={(e) => updatePost(idx, "url", e.target.value)}
+                      placeholder="https://linkedin.com/... or describe the topic"
+                      className="flex-1"
+                    />
+                    {idx > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removePost(idx)}
+                        className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <Select
+                    value={post.standout}
+                    onValueChange={(val) => updatePost(idx, "standout", val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="What made it stand out?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STANDOUT_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt.toLowerCase().replace(/\s+/g, "-")}>{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+              {persona.admired_posts.length < 3 && (
+                <button
+                  type="button"
+                  onClick={addPost}
+                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add another post
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="noGoTopic">Topics to avoid</Label>
+              <Input
+                id="noGoTopic"
+                value={persona.no_go_topic}
+                onChange={(e) => setPersona((p) => ({ ...p, no_go_topic: e.target.value }))}
+                placeholder="e.g. Politics, competitor names, salary discussions"
+              />
+            </div>
+          </div>
+
+          {/* === Section 3: Posting Rhythm === */}
+          <div className="space-y-5">
+            <h3 className="text-lg font-semibold text-foreground">Posting Rhythm</h3>
+
+            <div className="space-y-3">
+              <Label>Posts Per Week</Label>
+              <RadioGroup
+                value={persona.posts_per_week?.toString() || ""}
+                onValueChange={(val) => setPersona((p) => ({ ...p, posts_per_week: parseInt(val) }))}
+                className="space-y-2"
+              >
+                {POSTS_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                      persona.posts_per_week === opt.value
+                        ? "border-primary bg-primary/5"
+                        : "border-input hover:border-primary/40"
+                    }`}
+                  >
+                    <RadioGroupItem value={opt.value.toString()} className="mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium">{opt.label}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Best Days to Post (select up to 4)</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAYS.map((day) => {
+                  const selected = persona.preferred_days.includes(day);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => toggleDay(day)}
+                      className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                        selected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-input text-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Preferred Content Tone</Label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {TONE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setPersona((p) => ({ ...p, tone: opt.value }))}
+                    className={`p-4 rounded-lg border text-left transition-colors ${
+                      persona.tone === opt.value
+                        ? "border-primary bg-primary/5"
+                        : "border-input hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="text-sm font-medium block">{opt.label}</span>
+                    <p className="text-xs text-muted-foreground mt-1">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
-        
-        <CardFooter className="flex justify-between">
-          <Button variant="outline">Reset</Button>
-          <Button type="submit">Save Profile</Button>
+
+        <CardFooter className="flex justify-end">
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving..." : "Save Profile"}
+          </Button>
         </CardFooter>
       </form>
     </Card>
