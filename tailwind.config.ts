@@ -28,6 +28,11 @@ export default {
 					lightblue: '#e8f3fc',
 					dark: '#004182',
 				},
+				navy: {
+					DEFAULT: 'hsl(213, 80%, 14%)',
+					light: 'hsl(213, 40%, 25%)',
+				},
+				'onboarding-bg': 'hsl(var(--onboarding-bg))',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      personas: {
+        Row: {
+          admired_posts: Json | null
+          archetype: string
+          created_at: string
+          experience_range: string
+          future_goal: string
+          id: string
+          industry: string
+          location: string
+          no_go_topic: string | null
+          posts_per_week: number
+          preferred_days: string[]
+          tone: string
+          topics: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admired_posts?: Json | null
+          archetype: string
+          created_at?: string
+          experience_range: string
+          future_goal: string
+          id?: string
+          industry: string
+          location: string
+          no_go_topic?: string | null
+          posts_per_week: number
+          preferred_days: string[]
+          tone: string
+          topics: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admired_posts?: Json | null
+          archetype?: string
+          created_at?: string
+          experience_range?: string
+          future_goal?: string
+          id?: string
+          industry?: string
+          location?: string
+          no_go_topic?: string | null
+          posts_per_week?: number
+          preferred_days?: string[]
+          tone?: string
+          topics?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           content: string
