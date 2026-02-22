@@ -12,7 +12,7 @@ import useAuth from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 const Onboarding = () => {
-  const { user } = useAuth();
+  const { user, setOnboardingCompleted } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -57,10 +57,8 @@ const Onboarding = () => {
         description: "Welcome to LinkedIn Content Manager",
       });
       
-      console.log("Profile saved successfully, navigating to home page");
-      setTimeout(() => {
-        navigate("/");
-      }, 500);
+      setOnboardingCompleted?.(true);
+      navigate("/");
     } catch (error) {
       console.error("Error saving profile:", error);
       toast({

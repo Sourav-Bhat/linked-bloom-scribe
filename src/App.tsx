@@ -27,7 +27,7 @@ const queryClient = new QueryClient({
   },
 });
 
-export const AuthContext = createContext<{user: User | null}>({user: null});
+export const AuthContext = createContext<{user: User | null; setOnboardingCompleted?: (val: boolean) => void}>({user: null});
 
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -188,7 +188,7 @@ const App = () => {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthContext.Provider value={{ user }}>
+        <AuthContext.Provider value={{ user, setOnboardingCompleted }}>
           <TooltipProvider>
             <Toaster />
             <Sonner />
