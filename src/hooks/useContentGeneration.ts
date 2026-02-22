@@ -89,7 +89,7 @@ const useContentGeneration = (userId: string | undefined) => {
       if (userId) {
         try {
           const userDrafts = await getUserContents(userId);
-          setDrafts(userDrafts);
+          setDrafts(userDrafts as ContentPost[]);
         } catch (error) {
           console.error("Error loading drafts:", error);
           toast({
@@ -289,7 +289,7 @@ What innovative practices have you implemented in your organization?`,
       
       // Reload drafts
       const updatedDrafts = await getUserContents(userId);
-      setDrafts(updatedDrafts);
+      setDrafts(updatedDrafts as ContentPost[]);
     } catch (error) {
       console.error("Error saving content:", error);
       toast({
