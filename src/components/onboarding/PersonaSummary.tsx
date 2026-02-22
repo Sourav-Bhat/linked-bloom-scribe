@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import useAuth from "@/hooks/useAuth";
 
 interface PersonaSummaryProps {
   archetype: string;
@@ -17,9 +18,15 @@ const ARCHETYPE_DESCRIPTIONS: Record<string, string> = {
 
 const PersonaSummary = ({ archetype, topics, postsPerWeek, preferredDays, tone }: PersonaSummaryProps) => {
   const navigate = useNavigate();
+  const { setOnboardingCompleted } = useAuth();
 
   const daysList = preferredDays.join(" and ");
   const rhythm = `${postsPerWeek} post${postsPerWeek > 1 ? "s" : ""} per week on ${daysList}`;
+
+  const handleContinue = () => {
+    setOnboardingCompleted?.(true);
+    navigate("/");
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-onboarding-bg p-4">
@@ -56,7 +63,7 @@ const PersonaSummary = ({ archetype, topics, postsPerWeek, preferredDays, tone }
         </div>
 
         <Button
-          onClick={() => navigate("/")}
+          onClick={handleContinue}
           className="w-full max-w-xs mx-auto"
           size="lg"
         >
