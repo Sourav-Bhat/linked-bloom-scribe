@@ -107,8 +107,8 @@ const Onboarding = () => {
 
     try {
       // Save persona
-      const { error: personaError } = await supabase
-        .from("personas" as any)
+      const { error: personaError } = await (supabase
+        .from("personas" as any) as any)
         .upsert({
           user_id: user.id,
           industry: stepOne.industry,
@@ -116,13 +116,13 @@ const Onboarding = () => {
           location: stepOne.location,
           future_goal: stepOne.futureGoal,
           topics: stepTwo.topics,
-          admired_posts: stepTwo.admiredPosts.filter((p) => p.url.trim()),
+          admired_posts: stepTwo.admiredPosts.filter((p: any) => p.url.trim()),
           no_go_topic: stepTwo.noGoTopic,
           posts_per_week: stepThree.postsPerWeek,
           preferred_days: stepThree.preferredDays,
           tone: stepThree.tone,
           archetype: computedArchetype,
-        } as any);
+        }, { onConflict: 'user_id' });
 
       if (personaError) throw personaError;
 
