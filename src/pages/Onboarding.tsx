@@ -1,166 +1,224 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/use-toast";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import StepOne, { type StepOneData } from "@/components/onboarding/StepOne";
+import StepTwo, { type StepTwoData } from "@/components/onboarding/StepTwo";
+import StepThree, { type StepThreeData } from "@/components/onboarding/StepThree";
+import PersonaSummary from "@/components/onboarding/PersonaSummary";
+import { ArrowLeft } from "lucide-react";
+
+type Screen = "step1" | "step2" | "step3" | "loading" | "summary";
+
+function deriveArchetype(topics: string[]): string {
+  const oracleTopics = ["Industry Trends", "Innovation", "Future of Work"];
+  const builderTopics = ["Entrepreneurship", "Productivity", "Career Growth"];
+  const connectorTopics = ["Leadership", "Team Culture", "Hiring and Talent"];
+
+  const oracleCount = topics.filter((t) => oracleTopics.includes(t)).length;
+  const builderCount = topics.filter((t) => builderTopics.includes(t)).length;
+  const connectorCount = topics.filter((t) => connectorTopics.includes(t)).length;
+
+  if (oracleCount >= builderCount && oracleCount >= connectorCount && oracleCount > 0) return "The Oracle";
+  if (connectorCount >= builderCount && connectorCount > 0) return "The Connector";
+  return "The Builder";
+}
 
 const Onboarding = () => {
   const { user, setOnboardingCompleted } = useAuth();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    full_name: user?.user_metadata?.full_name || "",
-    job_title: "",
-    company: "",
+  const [screen, setScreen] = useState<Screen>("step1");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [stepOne, setStepOne] = useState<StepOneData>({
     industry: "",
-    bio: ""
+    experienceRange: "",
+    location: "",
+    futureGoal: "",
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const [stepTwo, setStepTwo] = useState<StepTwoData>({
+    topics: [],
+    admiredPosts: [{ url: "", standout: "" }],
+    noGoTopic: "",
+  });
+
+  const [stepThree, setStepThree] = useState<StepThreeData>({
+    postsPerWeek: null,
+    preferredDays: [],
+    tone: "",
+  });
+
+  const [archetype, setArchetype] = useState("The Builder");
+
+  const validateStepOne = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!stepOne.industry) e.industry = "Please select an industry";
+    if (!stepOne.experienceRange) e.experienceRange = "Please select your experience level";
+    if (!stepOne.location.trim()) e.location = "Please enter your location";
+    if (!stepOne.futureGoal.trim()) e.futureGoal = "Please share your future goal";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const validateStepTwo = (): boolean => {
+    const e: Record<string, string> = {};
+    if (stepTwo.topics.length < 3 || stepTwo.topics.length > 5) {
+      e.topics = "Please select between 3 and 5 topics";
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
+  const validateStepThree = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!stepThree.postsPerWeek) e.postsPerWeek = "Please select how often you want to post";
+    if (stepThree.preferredDays.length === 0) e.preferredDays = "Please select at least 1 day";
+    if (!stepThree.tone) e.tone = "Please select a content tone";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
-    try {
-      setIsLoading(true);
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          ...formData,
-          onboarding_completed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-      
-      toast({
-        title: "Profile created!",
-        description: "Welcome to LinkedIn Content Manager",
-      });
-      
-      setOnboardingCompleted?.(true);
-      navigate("/");
-    } catch (error) {
-      console.error("Error saving profile:", error);
-      toast({
-        title: "Error saving profile",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+  const handleNext = () => {
+    if (screen === "step1" && validateStepOne()) {
+      setErrors({});
+      setScreen("step2");
+    } else if (screen === "step2" && validateStepTwo()) {
+      setErrors({});
+      setScreen("step3");
     }
   };
 
+  const handleBack = () => {
+    setErrors({});
+    if (screen === "step2") setScreen("step1");
+    else if (screen === "step3") setScreen("step2");
+  };
+
+  const handleSubmit = async () => {
+    if (!validateStepThree() || !user) return;
+
+    const computedArchetype = deriveArchetype(stepTwo.topics);
+    setArchetype(computedArchetype);
+    setScreen("loading");
+
+    try {
+      // Save persona
+      const { error: personaError } = await supabase
+        .from("personas" as any)
+        .upsert({
+          user_id: user.id,
+          industry: stepOne.industry,
+          experience_range: stepOne.experienceRange,
+          location: stepOne.location,
+          future_goal: stepOne.futureGoal,
+          topics: stepTwo.topics,
+          admired_posts: stepTwo.admiredPosts.filter((p) => p.url.trim()),
+          no_go_topic: stepTwo.noGoTopic,
+          posts_per_week: stepThree.postsPerWeek,
+          preferred_days: stepThree.preferredDays,
+          tone: stepThree.tone,
+          archetype: computedArchetype,
+        } as any);
+
+      if (personaError) throw personaError;
+
+      // Update profile onboarding status
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          industry: stepOne.industry,
+          topics: stepTwo.topics,
+          posts_per_week: stepThree.postsPerWeek,
+          tone: stepThree.tone,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (profileError) throw profileError;
+
+      setOnboardingCompleted?.(true);
+
+      // Show loading briefly then summary
+      setTimeout(() => setScreen("summary"), 2500);
+    } catch (error) {
+      console.error("Error saving persona:", error);
+      toast({
+        title: "Error saving your profile",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      setScreen("step3");
+    }
+  };
+
+  const stepNumber = screen === "step1" ? 1 : screen === "step2" ? 2 : 3;
+  const progressValue = screen === "step1" ? 33 : screen === "step2" ? 66 : 100;
+
+  if (screen === "loading") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-onboarding-bg p-4">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mx-auto" />
+          <h2 className="text-xl font-semibold text-primary">Building your LinkedIn strategy...</h2>
+          <p className="text-sm text-muted-foreground">This will only take a moment</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "summary") {
+    return (
+      <PersonaSummary
+        archetype={archetype}
+        topics={stepTwo.topics}
+        postsPerWeek={stepThree.postsPerWeek!}
+        preferredDays={stepThree.preferredDays}
+        tone={stepThree.tone}
+      />
+    );
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle>Complete Your Profile</CardTitle>
-          <CardDescription>
-            Tell us more about yourself to help us personalize your content generation experience.
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen bg-onboarding-bg flex flex-col">
+      {/* Header */}
+      <div className="w-full max-w-2xl mx-auto px-4 pt-8 pb-4 space-y-3">
+        <p className="text-sm text-muted-foreground">Set up your content profile</p>
+        <div className="flex items-center gap-3">
+          <Progress value={progressValue} className="h-1.5 flex-1" />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Step {stepNumber} of 3</span>
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input
-                id="full_name"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleChange}
-                placeholder="John Doe"
-                required
-              />
-            </div>
+      {/* Content */}
+      <div className="flex-1 w-full max-w-2xl mx-auto px-4 pb-8">
+        <div className="bg-background rounded-xl border border-input p-6 sm:p-8">
+          {screen === "step1" && <StepOne data={stepOne} onChange={setStepOne} errors={errors} />}
+          {screen === "step2" && <StepTwo data={stepTwo} onChange={setStepTwo} errors={errors} />}
+          {screen === "step3" && <StepThree data={stepThree} onChange={setStepThree} errors={errors} />}
 
-            <div className="space-y-2">
-              <Label htmlFor="job_title">Job Title</Label>
-              <Input
-                id="job_title"
-                name="job_title"
-                value={formData.job_title}
-                onChange={handleChange}
-                placeholder="Product Manager"
-                required
-              />
-            </div>
+          {/* Navigation */}
+          <div className="flex justify-between mt-8">
+            {screen !== "step1" ? (
+              <Button variant="ghost" onClick={handleBack} className="gap-2">
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Button>
+            ) : (
+              <div />
+            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
-              <Input
-                id="company"
-                name="company"
-                value={formData.company}
-                onChange={handleChange}
-                placeholder="Acme Inc."
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="industry">Industry</Label>
-              <Select
-                value={formData.industry}
-                onValueChange={(value) => handleSelectChange("industry", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your industry" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="technology">Technology</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
-                  <SelectItem value="healthcare">Healthcare</SelectItem>
-                  <SelectItem value="education">Education</SelectItem>
-                  <SelectItem value="retail">Retail</SelectItem>
-                  <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio">Professional Bio</Label>
-              <Textarea
-                id="bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleChange}
-                placeholder="Tell us about your professional experience and interests..."
-                className="min-h-[100px]"
-                required
-              />
-            </div>
-          </CardContent>
-
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Complete Profile"}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+            {screen === "step3" ? (
+              <Button onClick={handleSubmit}>Submit</Button>
+            ) : (
+              <Button onClick={handleNext}>Next</Button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
