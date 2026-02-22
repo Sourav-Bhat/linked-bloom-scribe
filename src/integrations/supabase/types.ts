@@ -53,26 +53,47 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
+          company: string | null
           created_at: string
           full_name: string | null
           id: string
+          industry: string | null
+          job_title: string | null
           onboarding_completed: boolean
+          posts_per_week: number | null
+          tone: string | null
+          topics: string[] | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
+          company?: string | null
           created_at?: string
           full_name?: string | null
           id: string
+          industry?: string | null
+          job_title?: string | null
           onboarding_completed?: boolean
+          posts_per_week?: number | null
+          tone?: string | null
+          topics?: string[] | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
+          company?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
+          industry?: string | null
+          job_title?: string | null
           onboarding_completed?: boolean
+          posts_per_week?: number | null
+          tone?: string | null
+          topics?: string[] | null
           updated_at?: string
         }
         Relationships: []
