@@ -141,8 +141,7 @@ const Onboarding = () => {
 
       if (profileError) throw profileError;
 
-      setOnboardingCompleted?.(true);
-
+      // Don't call setOnboardingCompleted yet — show summary first
       // Show loading briefly then summary
       setTimeout(() => setScreen("summary"), 2500);
     } catch (error) {
