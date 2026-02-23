@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
@@ -11,25 +10,10 @@ import StepThree, { type StepThreeData } from "@/components/onboarding/StepThree
 import PersonaSummary from "@/components/onboarding/PersonaSummary";
 import { ArrowLeft } from "lucide-react";
 
-type Screen = "step1" | "step2" | "step3" | "loading" | "summary";
-
-function deriveArchetype(topics: string[]): string {
-  const oracleTopics = ["Industry Trends", "Innovation", "Future of Work"];
-  const builderTopics = ["Entrepreneurship", "Productivity", "Career Growth"];
-  const connectorTopics = ["Leadership", "Team Culture", "Hiring and Talent"];
-
-  const oracleCount = topics.filter((t) => oracleTopics.includes(t)).length;
-  const builderCount = topics.filter((t) => builderTopics.includes(t)).length;
-  const connectorCount = topics.filter((t) => connectorTopics.includes(t)).length;
-
-  if (oracleCount >= builderCount && oracleCount >= connectorCount && oracleCount > 0) return "The Oracle";
-  if (connectorCount >= builderCount && connectorCount > 0) return "The Connector";
-  return "The Builder";
-}
+type Screen = "step1" | "step2" | "step3" | "summary";
 
 const Onboarding = () => {
-  const { user, setOnboardingCompleted } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [screen, setScreen] = useState<Screen>("step1");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -52,7 +36,9 @@ const Onboarding = () => {
     tone: "",
   });
 
-  const [archetype, setArchetype] = useState("The Builder");
+  const [personaData, setPersonaData] = useState<any>(null);
+  const [personaLoading, setPersonaLoading] = useState(false);
+  const [personaError, setPersonaError] = useState<string | null>(null);
 
   const validateStepOne = (): boolean => {
     const e: Record<string, string> = {};
@@ -98,93 +84,73 @@ const Onboarding = () => {
     else if (screen === "step3") setScreen("step2");
   };
 
-  const handleSubmit = async () => {
-    if (!validateStepThree() || !user) return;
+  const callPersonaAgent = useCallback(async () => {
+    if (!user) return;
 
-    const computedArchetype = deriveArchetype(stepTwo.topics);
-    setArchetype(computedArchetype);
-    setScreen("loading");
+    setPersonaLoading(true);
+    setPersonaError(null);
+    setScreen("summary");
+
+    const onboardingData = {
+      industry: stepOne.industry,
+      experienceRange: stepOne.experienceRange,
+      location: stepOne.location,
+      futureGoal: stepOne.futureGoal,
+      topics: stepTwo.topics,
+      admiredPosts: stepTwo.admiredPosts.filter((p) => p.url.trim()),
+      noGoTopic: stepTwo.noGoTopic,
+      postsPerWeek: stepThree.postsPerWeek,
+      preferredDays: stepThree.preferredDays,
+      tone: stepThree.tone,
+    };
 
     try {
-      // Save persona
-      const { error: personaError } = await (supabase
-        .from("personas" as any) as any)
-        .upsert({
-          user_id: user.id,
-          industry: stepOne.industry,
-          experience_range: stepOne.experienceRange,
-          location: stepOne.location,
-          future_goal: stepOne.futureGoal,
-          topics: stepTwo.topics,
-          admired_posts: stepTwo.admiredPosts.filter((p: any) => p.url.trim()),
-          no_go_topic: stepTwo.noGoTopic,
-          posts_per_week: stepThree.postsPerWeek,
-          preferred_days: stepThree.preferredDays,
-          tone: stepThree.tone,
-          archetype: computedArchetype,
-        }, { onConflict: 'user_id' });
-
-      if (personaError) throw personaError;
-
-      // Update profile onboarding status
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          onboarding_completed: true,
-          industry: stepOne.industry,
-          topics: stepTwo.topics,
-          posts_per_week: stepThree.postsPerWeek,
-          tone: stepThree.tone,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
-
-      if (profileError) throw profileError;
-
-      // Don't call setOnboardingCompleted yet — show summary first
-      // Show loading briefly then summary
-      setTimeout(() => setScreen("summary"), 2500);
-    } catch (error) {
-      console.error("Error saving persona:", error);
-      toast({
-        title: "Error saving your profile",
-        description: "Please try again.",
-        variant: "destructive",
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke("persona-agent", {
+        body: { onboardingData, userId: user.id },
       });
-      setScreen("step3");
+
+      if (res.error) throw new Error(res.error.message || "API call failed");
+      
+      const responseData = res.data;
+      if (responseData?.persona) {
+        setPersonaData(responseData.persona);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (err: any) {
+      console.error("Persona agent error:", err);
+      setPersonaError(err.message || "Failed to generate persona");
+    } finally {
+      setPersonaLoading(false);
     }
+  }, [user, stepOne, stepTwo, stepThree]);
+
+  const handleSubmit = () => {
+    if (!validateStepThree() || !user) return;
+    callPersonaAgent();
   };
 
-  const stepNumber = screen === "step1" ? 1 : screen === "step2" ? 2 : 3;
-  const progressValue = screen === "step1" ? 33 : screen === "step2" ? 66 : 100;
-
-  if (screen === "loading") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-onboarding-bg p-4">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mx-auto" />
-          <h2 className="text-xl font-semibold text-primary">Building your LinkedIn strategy...</h2>
-          <p className="text-sm text-muted-foreground">This will only take a moment</p>
-        </div>
-      </div>
-    );
-  }
+  const handleRetry = () => {
+    callPersonaAgent();
+  };
 
   if (screen === "summary") {
     return (
       <PersonaSummary
-        archetype={archetype}
-        topics={stepTwo.topics}
-        postsPerWeek={stepThree.postsPerWeek!}
-        preferredDays={stepThree.preferredDays}
-        tone={stepThree.tone}
+        persona={personaData}
+        isLoading={personaLoading}
+        error={personaError}
+        onRetry={handleRetry}
       />
     );
   }
 
+  const stepNumber = screen === "step1" ? 1 : screen === "step2" ? 2 : 3;
+  const progressValue = screen === "step1" ? 33 : screen === "step2" ? 66 : 100;
+
   return (
     <div className="min-h-screen bg-onboarding-bg flex flex-col">
-      {/* Header */}
       <div className="w-full max-w-2xl mx-auto px-4 pt-8 pb-4 space-y-3">
         <p className="text-sm text-muted-foreground">Set up your content profile</p>
         <div className="flex items-center gap-3">
@@ -193,14 +159,12 @@ const Onboarding = () => {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 w-full max-w-2xl mx-auto px-4 pb-8">
         <div className="bg-background rounded-xl border border-input p-6 sm:p-8">
           {screen === "step1" && <StepOne data={stepOne} onChange={setStepOne} errors={errors} />}
           {screen === "step2" && <StepTwo data={stepTwo} onChange={setStepTwo} errors={errors} />}
           {screen === "step3" && <StepThree data={stepThree} onChange={setStepThree} errors={errors} />}
 
-          {/* Navigation */}
           <div className="flex justify-between mt-8">
             {screen !== "step1" ? (
               <Button variant="ghost" onClick={handleBack} className="gap-2">
