@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,14 +15,16 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, X } from "lucide-react";
+import { Plus, X, ImagePlus } from "lucide-react";
 
 interface AdmiredPost {
   url: string;
   standout: string;
+  imageUrl?: string;
 }
 
 interface PersonaData {
+  linkedin_url: string;
   industry: string;
   experience_range: string;
   location: string;
@@ -86,6 +88,7 @@ export const ProfileForm = ({
   userId,
 }: ProfileFormProps) => {
   const [persona, setPersona] = useState<PersonaData>({
+    linkedin_url: "",
     industry: "",
     experience_range: "",
     location: "",
@@ -98,6 +101,7 @@ export const ProfileForm = ({
     tone: "",
     archetype: "",
   });
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -113,6 +117,7 @@ export const ProfileForm = ({
         if (error) throw error;
         if (data) {
           setPersona({
+            linkedin_url: data.linkedin_url || "",
             industry: data.industry || "",
             experience_range: data.experience_range || "",
             location: data.location || "",
@@ -185,6 +190,34 @@ export const ProfileForm = ({
     }));
   };
 
+  const handleImageUpload = async (index: number, file: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("admired-posts").upload(path, file);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("admired-posts").getPublicUrl(path);
+      setPersona((prev) => {
+        const posts = [...prev.admired_posts];
+        posts[index] = { ...posts[index], imageUrl: urlData.publicUrl };
+        return { ...prev, admired_posts: posts };
+      });
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast({ title: "Upload failed", description: "Could not upload image.", variant: "destructive" });
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setPersona((prev) => {
+      const posts = [...prev.admired_posts];
+      posts[index] = { ...posts[index], imageUrl: undefined };
+      return { ...prev, admired_posts: posts };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -193,12 +226,13 @@ export const ProfileForm = ({
         .from("personas" as any) as any)
         .upsert({
           user_id: userId,
+          linkedin_url: persona.linkedin_url,
           industry: persona.industry,
           experience_range: persona.experience_range,
           location: persona.location,
           future_goal: persona.future_goal,
           topics: persona.topics,
-          admired_posts: persona.admired_posts.filter((p) => p.url.trim()),
+          admired_posts: persona.admired_posts.filter((p) => p.url.trim() || p.imageUrl),
           no_go_topic: persona.no_go_topic,
           posts_per_week: persona.posts_per_week,
           preferred_days: persona.preferred_days,
@@ -255,6 +289,16 @@ export const ProfileForm = ({
           {/* === Section 1: Professional Background === */}
           <div className="space-y-5">
             <h3 className="text-lg font-semibold text-foreground">Professional Background</h3>
+
+            <div className="space-y-2">
+              <Label htmlFor="linkedinUrl">LinkedIn Profile URL</Label>
+              <Input
+                id="linkedinUrl"
+                value={persona.linkedin_url}
+                onChange={(e) => setPersona((p) => ({ ...p, linkedin_url: e.target.value }))}
+                placeholder="https://linkedin.com/in/your-profile"
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="industry">Industry</Label>
@@ -355,13 +399,31 @@ export const ProfileForm = ({
             <div className="space-y-3">
               <Label>Admired LinkedIn Posts</Label>
               {persona.admired_posts.map((post, idx) => (
-                <div key={idx} className="p-4 rounded-lg border border-input bg-background space-y-3">
+              <div key={idx} className="p-4 rounded-lg border border-input bg-background space-y-3">
                   <div className="flex items-start gap-2">
                     <Input
                       value={post.url}
                       onChange={(e) => updatePost(idx, "url", e.target.value)}
                       placeholder="https://linkedin.com/... or describe the topic"
                       className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRefs.current[idx]?.click()}
+                      className="p-2 text-muted-foreground hover:text-primary transition-colors border border-input rounded-md"
+                      title="Upload screenshot"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                    </button>
+                    <input
+                      ref={(el) => { fileInputRefs.current[idx] = el; }}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(idx, file);
+                      }}
                     />
                     {idx > 0 && (
                       <button
@@ -373,6 +435,18 @@ export const ProfileForm = ({
                       </button>
                     )}
                   </div>
+                  {post.imageUrl && (
+                    <div className="relative inline-block">
+                      <img src={post.imageUrl} alt="Admired post" className="max-h-40 rounded-md border border-input object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(idx)}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                   <Select
                     value={post.standout}
                     onValueChange={(val) => updatePost(idx, "standout", val)}

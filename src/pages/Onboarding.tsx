@@ -22,6 +22,7 @@ const Onboarding = () => {
     experienceRange: "",
     location: "",
     futureGoal: "",
+    linkedinUrl: "",
   });
 
   const [stepTwo, setStepTwo] = useState<StepTwoData>({
@@ -96,8 +97,9 @@ const Onboarding = () => {
       experienceRange: stepOne.experienceRange,
       location: stepOne.location,
       futureGoal: stepOne.futureGoal,
+      linkedinUrl: stepOne.linkedinUrl,
       topics: stepTwo.topics,
-      admiredPosts: stepTwo.admiredPosts.filter((p) => p.url.trim()),
+      admiredPosts: stepTwo.admiredPosts.filter((p) => p.url.trim() || p.imageUrl),
       noGoTopic: stepTwo.noGoTopic,
       postsPerWeek: stepThree.postsPerWeek,
       preferredDays: stepThree.preferredDays,

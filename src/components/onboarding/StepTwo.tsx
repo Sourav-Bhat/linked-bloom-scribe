@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -7,12 +8,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, X } from "lucide-react";
+import { Plus, X, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 export interface AdmiredPost {
   url: string;
   standout: string;
+  imageUrl?: string;
 }
 
 export interface StepTwoData {
@@ -39,6 +43,8 @@ const STANDOUT_OPTIONS = [
 ];
 
 const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   const toggleTopic = (topic: string) => {
     const current = data.topics;
     if (current.includes(topic)) {
@@ -64,6 +70,39 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
 
   const removePost = (index: number) => {
     onChange({ ...data, admiredPosts: data.admiredPosts.filter((_, i) => i !== index) });
+  };
+
+  const handleImageUpload = async (index: number, file: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("admired-posts")
+        .upload(path, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("admired-posts")
+        .getPublicUrl(path);
+
+      const posts = [...data.admiredPosts];
+      posts[index] = { ...posts[index], imageUrl: urlData.publicUrl };
+      onChange({ ...data, admiredPosts: posts });
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast({ title: "Upload failed", description: "Could not upload image.", variant: "destructive" });
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const posts = [...data.admiredPosts];
+    posts[index] = { ...posts[index], imageUrl: undefined };
+    onChange({ ...data, admiredPosts: posts });
   };
 
   return (
@@ -104,6 +143,7 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
         {/* Admired Posts */}
         <div className="space-y-3">
           <Label>Share up to 3 LinkedIn posts you wish you had written</Label>
+          <p className="text-xs text-muted-foreground">Paste a URL or upload a screenshot of the post</p>
           {data.admiredPosts.map((post, idx) => (
             <div key={idx} className="p-4 rounded-lg border border-input bg-background space-y-3">
               <div className="flex items-start gap-2">
@@ -112,6 +152,24 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
                   onChange={(e) => updatePost(idx, "url", e.target.value)}
                   placeholder="https://linkedin.com/... or describe the topic"
                   className="flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRefs.current[idx]?.click()}
+                  className="p-2 text-muted-foreground hover:text-primary transition-colors border border-input rounded-md"
+                  title="Upload screenshot"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                </button>
+                <input
+                  ref={(el) => { fileInputRefs.current[idx] = el; }}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(idx, file);
+                  }}
                 />
                 {idx > 0 && (
                   <button
@@ -123,6 +181,25 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
                   </button>
                 )}
               </div>
+
+              {/* Image preview */}
+              {post.imageUrl && (
+                <div className="relative inline-block">
+                  <img
+                    src={post.imageUrl}
+                    alt="Admired post screenshot"
+                    className="max-h-40 rounded-md border border-input object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
               <Select
                 value={post.standout}
                 onValueChange={(val) => updatePost(idx, "standout", val)}
