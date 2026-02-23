@@ -2,6 +2,7 @@
 import useAuth from "@/hooks/useAuth";
 import ProfileForm from "@/components/profile/ProfileForm";
 import PersonaDisplay from "@/components/profile/PersonaDisplay";
+import PrAgentChat from "@/components/profile/PrAgentChat";
 import ApiKeySettings from "@/components/profile/ApiKeySettings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,12 +24,17 @@ const Profile = () => {
       <Tabs defaultValue="persona" className="space-y-6">
         <TabsList>
           <TabsTrigger value="persona">My Persona</TabsTrigger>
+          <TabsTrigger value="agent">PR Agent</TabsTrigger>
           <TabsTrigger value="settings">Edit Profile</TabsTrigger>
           <TabsTrigger value="api">API Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="persona">
           <PersonaDisplay userId={user.id} />
+        </TabsContent>
+
+        <TabsContent value="agent">
+          <PrAgentChat userId={user.id} />
         </TabsContent>
 
         <TabsContent value="settings">
