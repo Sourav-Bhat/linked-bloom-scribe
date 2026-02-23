@@ -125,6 +125,7 @@ Ensure exactly 3 content pillars. The archetype should be derived from their top
       preferred_days: onboardingData.preferredDays,
       tone: onboardingData.tone,
       archetype: persona.archetype.name,
+      persona_data: persona,
     };
 
     const { error: upsertError } = await supabase

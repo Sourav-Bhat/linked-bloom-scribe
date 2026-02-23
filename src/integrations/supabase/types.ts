@@ -25,6 +25,7 @@ export type Database = {
           industry: string
           location: string
           no_go_topic: string | null
+          persona_data: Json | null
           posts_per_week: number
           preferred_days: string[]
           tone: string
@@ -42,6 +43,7 @@ export type Database = {
           industry: string
           location: string
           no_go_topic?: string | null
+          persona_data?: Json | null
           posts_per_week: number
           preferred_days: string[]
           tone: string
@@ -59,6 +61,7 @@ export type Database = {
           industry?: string
           location?: string
           no_go_topic?: string | null
+          persona_data?: Json | null
           posts_per_week?: number
           preferred_days?: string[]
           tone?: string
