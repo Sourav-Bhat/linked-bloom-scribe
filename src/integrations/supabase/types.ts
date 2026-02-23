@@ -23,6 +23,7 @@ export type Database = {
           future_goal: string
           id: string
           industry: string
+          linkedin_url: string | null
           location: string
           no_go_topic: string | null
           persona_data: Json | null
@@ -41,6 +42,7 @@ export type Database = {
           future_goal: string
           id?: string
           industry: string
+          linkedin_url?: string | null
           location: string
           no_go_topic?: string | null
           persona_data?: Json | null
@@ -59,6 +61,7 @@ export type Database = {
           future_goal?: string
           id?: string
           industry?: string
+          linkedin_url?: string | null
           location?: string
           no_go_topic?: string | null
           persona_data?: Json | null

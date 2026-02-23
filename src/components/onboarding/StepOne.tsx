@@ -16,6 +16,7 @@ export interface StepOneData {
   experienceRange: string;
   location: string;
   futureGoal: string;
+  linkedinUrl: string;
 }
 
 interface StepOneProps {
@@ -49,6 +50,19 @@ const StepOne = ({ data, onChange, errors }: StepOneProps) => {
       </div>
 
       <div className="space-y-5">
+        {/* LinkedIn Profile */}
+        <div className="space-y-2">
+          <Label htmlFor="linkedinUrl">Your LinkedIn Profile URL</Label>
+          <Input
+            id="linkedinUrl"
+            value={data.linkedinUrl}
+            onChange={(e) => onChange({ ...data, linkedinUrl: e.target.value })}
+            placeholder="https://linkedin.com/in/your-profile"
+            className={errors.linkedinUrl ? "border-destructive" : ""}
+          />
+          {errors.linkedinUrl && <p className="text-sm text-destructive">{errors.linkedinUrl}</p>}
+        </div>
+
         {/* Industry */}
         <div className="space-y-2">
           <Label htmlFor="industry">Industry</Label>

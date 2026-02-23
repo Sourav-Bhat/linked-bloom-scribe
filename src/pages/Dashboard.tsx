@@ -171,50 +171,11 @@ const Dashboard = () => {
         </div>
       </div>
       
-      {/* Onboarding prompt for new users */}
+      {/* Empty state */}
       {posts.length === 0 && (
-        <Card className="bg-linkedin-lightblue border-linkedin-blue mt-8">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-bold mb-2">Get Started with LinkedIn Content</h3>
-            <p className="mb-4">Complete these steps to set up your content generation strategy:</p>
-            
-            <div className="space-y-3">
-              <div className="flex items-start">
-                <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
-                  1
-                </div>
-                <div>
-                  <Link to="/profile" className="font-medium text-linkedin-blue hover:underline">
-                    Set up your content profile
-                  </Link>
-                  <p className="text-sm">Define your topics, interests, and posting preferences</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
-                  2
-                </div>
-                <div>
-                  <Link to="/generator" className="font-medium text-linkedin-blue hover:underline">
-                    Generate your first post
-                  </Link>
-                  <p className="text-sm">Create personalized LinkedIn content with AI assistance</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <div className="bg-white rounded-full h-6 w-6 flex items-center justify-center text-sm font-bold text-linkedin-blue mr-3 mt-0.5">
-                  3
-                </div>
-                <div>
-                  <Link to="/calendar" className="font-medium text-linkedin-blue hover:underline">
-                    Plan your content calendar
-                  </Link>
-                  <p className="text-sm">Schedule posts for optimal engagement</p>
-                </div>
-              </div>
-            </div>
+        <Card className="mt-8">
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">No posts yet. Click "Create New Post" to get started.</p>
           </CardContent>
         </Card>
       )}
