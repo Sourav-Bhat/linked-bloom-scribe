@@ -254,7 +254,33 @@ export const ProfileForm = ({
         })
         .eq("id", userId);
 
-      toast({ title: "Profile updated!", description: "Your content persona has been saved." });
+      toast({ title: "Profile saved!", description: "Regenerating your persona..." });
+
+      // Regenerate persona using the edge function
+      const { data: result, error: fnError } = await supabase.functions.invoke("persona-agent", {
+        body: {
+          onboardingData: {
+            industry: persona.industry,
+            experienceRange: persona.experience_range,
+            location: persona.location,
+            futureGoal: persona.future_goal,
+            linkedinUrl: persona.linkedin_url,
+            topics: persona.topics,
+            admiredPosts: persona.admired_posts.filter((p) => p.url.trim() || p.imageUrl),
+            noGoTopic: persona.no_go_topic,
+            postsPerWeek: persona.posts_per_week,
+            preferredDays: persona.preferred_days,
+            tone: persona.tone,
+          },
+        },
+      });
+
+      if (fnError) {
+        console.error("Persona generation error:", fnError);
+        toast({ title: "Profile saved", description: "But persona regeneration failed. You can regenerate it from the My Persona tab.", variant: "destructive" });
+      } else {
+        toast({ title: "Persona updated!", description: "Your LinkedIn strategy has been refreshed." });
+      }
     } catch (err) {
       console.error("Error saving persona:", err);
       toast({ title: "Save failed", description: "Please try again.", variant: "destructive" });
