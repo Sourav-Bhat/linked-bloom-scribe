@@ -101,9 +101,18 @@ export const ProfileForm = ({
     tone: "",
     archetype: "",
   });
+  const [customTopicInput, setCustomTopicInput] = useState("");
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const addCustomTopic = () => {
+    const topic = customTopicInput.trim();
+    if (topic && !persona.topics.includes(topic) && persona.topics.length < 5) {
+      setPersona((prev) => ({ ...prev, topics: [...prev.topics, topic] }));
+      setCustomTopicInput("");
+    }
+  };
 
   useEffect(() => {
     async function loadPersona() {
@@ -402,8 +411,9 @@ export const ProfileForm = ({
             <div className="space-y-3">
               <Label>Content Topics (select 3 to 5)</Label>
               <div className="flex flex-wrap gap-2">
-                {ALL_TOPICS.map((topic) => {
+                {[...new Set([...ALL_TOPICS, ...persona.topics])].map((topic) => {
                   const selected = persona.topics.includes(topic);
+                  const isCustom = !ALL_TOPICS.includes(topic);
                   return (
                     <button
                       key={topic}
@@ -416,9 +426,29 @@ export const ProfileForm = ({
                       }`}
                     >
                       {topic}
+                      {isCustom && selected && (
+                        <X className="inline h-3 w-3 ml-1" />
+                      )}
                     </button>
                   );
                 })}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Add a custom topic..."
+                  value={customTopicInput}
+                  onChange={(e) => setCustomTopicInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomTopic();
+                    }
+                  }}
+                  className="max-w-xs"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={addCustomTopic}>
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                </Button>
               </div>
             </div>
 
