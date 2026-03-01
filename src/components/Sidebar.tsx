@@ -2,7 +2,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Calendar as CalendarIcon, Home, Settings, Edit, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { signOut } from "@/services/authService";
+import { signOut } from "@/features/auth/authService";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 

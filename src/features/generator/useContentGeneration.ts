@@ -8,7 +8,7 @@ import {
   getContent, 
   updateContent,
   getUserContents
-} from '@/services/contentService';
+} from '@/features/generator/contentService';
 
 /**
  * Custom hook for content generation functionality

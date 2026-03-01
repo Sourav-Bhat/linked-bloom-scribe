@@ -2,13 +2,13 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import useAuth from "@/hooks/useAuth";
-import { updateContentStatus } from "@/services/contentService";
+import useAuth from "@/features/auth/useAuth";
+import { updateContentStatus } from "@/features/generator/contentService";
 import { useToast } from "@/hooks/use-toast";
-import ContentForm from "@/components/generator/ContentForm";
-import ContentPreview from "@/components/generator/ContentPreview";
-import DraftsList from "@/components/generator/DraftsList";
-import useContentGeneration from "@/hooks/useContentGeneration";
+import ContentForm from "@/features/generator/ContentForm";
+import ContentPreview from "@/features/generator/ContentPreview";
+import DraftsList from "@/features/generator/DraftsList";
+import useContentGeneration from "@/features/generator/useContentGeneration";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
