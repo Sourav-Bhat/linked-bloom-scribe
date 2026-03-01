@@ -2,12 +2,12 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
-import useAuth from "@/hooks/useAuth";
+import useAuth from "@/features/auth/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import StepOne, { type StepOneData } from "@/components/onboarding/StepOne";
-import StepTwo, { type StepTwoData } from "@/components/onboarding/StepTwo";
-import StepThree, { type StepThreeData } from "@/components/onboarding/StepThree";
-import PersonaSummary from "@/components/onboarding/PersonaSummary";
+import StepOne, { type StepOneData } from "@/features/onboarding/StepOne";
+import StepTwo, { type StepTwoData } from "@/features/onboarding/StepTwo";
+import StepThree, { type StepThreeData } from "@/features/onboarding/StepThree";
+import PersonaSummary from "@/features/onboarding/PersonaSummary";
 import { ArrowLeft } from "lucide-react";
 
 type Screen = "step1" | "step2" | "step3" | "summary";

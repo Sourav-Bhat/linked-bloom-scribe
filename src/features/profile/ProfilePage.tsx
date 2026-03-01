@@ -1,9 +1,9 @@
 
-import useAuth from "@/hooks/useAuth";
-import ProfileForm from "@/components/profile/ProfileForm";
-import PersonaDisplay from "@/components/profile/PersonaDisplay";
-import PrAgentChat from "@/components/profile/PrAgentChat";
-import ApiKeySettings from "@/components/profile/ApiKeySettings";
+import useAuth from "@/features/auth/useAuth";
+import ProfileForm from "@/features/profile/ProfileForm";
+import PersonaDisplay from "@/features/profile/PersonaDisplay";
+import PrAgentChat from "@/features/profile/PrAgentChat";
+import ApiKeySettings from "@/features/profile/ApiKeySettings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 

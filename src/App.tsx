@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,14 +6,14 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { createContext, useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from './integrations/supabase/client';
-import Dashboard from "./pages/Dashboard";
-import Profile from "./pages/Profile";
-import Generator from "./pages/Generator";
-import Calendar from "./pages/Calendar";
-import Review from "./pages/Review";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import Onboarding from "./pages/Onboarding";
+import Dashboard from "@/features/dashboard/DashboardPage";
+import Profile from "@/features/profile/ProfilePage";
+import Generator from "@/features/generator/GeneratorPage";
+import Calendar from "@/features/calendar/CalendarPage";
+import Review from "@/features/review/ReviewPage";
+import NotFound from "@/features/notfound/NotFoundPage";
+import Login from "@/features/auth/LoginPage";
+import Onboarding from "@/features/onboarding/OnboardingPage";
 import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
 

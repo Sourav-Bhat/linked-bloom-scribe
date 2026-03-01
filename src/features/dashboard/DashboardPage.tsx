@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Calendar as CalendarIcon, Edit, Clock } from "lucide-react";
-import useAuth from "@/hooks/useAuth";
-import { getUserProfile } from "@/services/profileService";
-import { getUserContents } from "@/services/contentService";
+import useAuth from "@/features/auth/useAuth";
+import { getUserProfile } from "@/features/profile/profileService";
+import { getUserContents } from "@/features/generator/contentService";
 import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {

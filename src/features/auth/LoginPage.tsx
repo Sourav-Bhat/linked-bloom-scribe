@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/components/ui/use-toast";
-import { signInWithEmail } from "@/services/authService";
-import { hasCompletedProfile } from "@/services/profileService";
+import { signInWithEmail } from "@/features/auth/authService";
+import { hasCompletedProfile } from "@/features/profile/profileService";
 import { AlertTriangle, Wifi, WifiOff } from "lucide-react";
 
 const Login = () => {

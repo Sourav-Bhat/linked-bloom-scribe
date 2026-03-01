@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Linkedin } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
-import { saveLinkedInToken } from "@/services/linkedinService";
+import { saveLinkedInToken } from "@/features/linkedin/linkedinService";
 import { auth } from "@/lib/firebase";
 
 const LinkedInConnect = () => {
