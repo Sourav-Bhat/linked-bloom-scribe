@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { ContentPost, GenerationParams } from '@/lib/types';
-import { 
-  saveGeneratedContent, 
-  getContent, 
+import {
+  saveGeneratedContent,
+  getContent,
   updateContent,
   getUserContents
 } from '@/features/generator/contentService';
@@ -125,22 +126,23 @@ const useContentGeneration = (userId: string | undefined) => {
 
     setIsGenerating(true);
     try {
-      // In a real implementation, this would call your LLM REST API
-      // For now we're using mock data
+      const { data, error } = await supabase.functions.invoke("generate-content", {
+        body: {
+          topic: formData.topic,
+          tone: formData.tone,
+          instructions: formData.instructions,
+          includeHashtags: formData.includeHashtags,
+          postLength: formData.postLength,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       const generatedPost: Partial<ContentPost> = {
-        title: `Revolutionizing ${formData.topic} with AI-Powered Insights`,
-        content: `As professionals in ${formData.topic}, we're constantly seeking ways to innovate. I've recently integrated AI into our process, and the results have been eye-opening.
-
-Here's what we've learned:
-
-1. AI can analyze thousands of data points in minutes, revealing patterns humans might miss
-2. Sentiment analysis helps prioritize features based on emotional impact
-3. Predictive modeling allows us to test hypotheses without costly prototypes
-
-The most surprising insight? Users often don't explicitly state their most significant pain points - AI helps uncover these hidden frustrations.
-
-What tools are you using to enhance your ${formData.topic} strategy? I'd love to hear your experiences.`,
-        hashtags: formData.includeHashtags ? `#${formData.topic.replace(/\s+/g, '')} #AI #Innovation #DataDriven #FutureOfWork` : "",
+        title: data.title,
+        content: data.content,
+        hashtags: data.hashtags || "",
         status: "draft",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -148,7 +150,7 @@ What tools are you using to enhance your ${formData.topic} strategy? I'd love to
         topic: formData.topic,
         tone: formData.tone,
         instructions: formData.instructions,
-        postLength: formData.postLength as "short" | "medium" | "long"
+        postLength: formData.postLength as "short" | "medium" | "long",
       };
 
       setGeneratedContent(generatedPost);
@@ -157,13 +159,13 @@ What tools are you using to enhance your ${formData.topic} strategy? I'd love to
       setEditedHashtags(generatedPost.hashtags || "");
       toast({
         title: "Content Generated",
-        description: "Your LinkedIn post has been created. You can edit it before saving.",
+        description: "Your LinkedIn post is ready. Edit it before saving.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating content:", error);
       toast({
         title: "Generation Failed",
-        description: "Failed to generate content. Please try again.",
+        description: error?.message || "Failed to generate content. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -186,29 +188,35 @@ What tools are you using to enhance your ${formData.topic} strategy? I'd love to
       // Get existing versions or create a new array
       const existingVersions = generatedContent?.versions || [];
 
-      // In a real implementation, this would call your LLM REST API with the regeneration prompt
-      // For now we're using mock data
+      const previousContent = isEditing ? editedContent : (generatedContent?.content || "");
+
+      const { data, error } = await supabase.functions.invoke("generate-content", {
+        body: {
+          topic: formData.topic,
+          tone: formData.tone,
+          instructions: formData.instructions,
+          includeHashtags: formData.includeHashtags,
+          postLength: formData.postLength,
+          regeneratePrompt,
+          previousContent,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       const regeneratedPost: Partial<ContentPost> = {
-        title: `New Insights: ${formData.topic}`,
-        content: `Based on your request: "${regeneratePrompt}", here's a fresh perspective on ${formData.topic}.
-
-AI-driven research reveals that companies focusing on innovation see a 23% increase in customer loyalty. When we examine the data more carefully:
-
-1. Strategic initiatives correlate strongly with millennial and Gen-Z engagement
-2. Transparent communication increases trust by 37%
-3. Companies with clear innovation roadmaps outperform peers in long-term growth
-
-The key takeaway? Strategic innovation isn't just good for the business - it's becoming essential for market leadership.
-
-What innovative practices have you implemented in your organization?`,
-        hashtags: formData.includeHashtags ? `#Innovation #${formData.topic.replace(/\s+/g, '')} #Leadership #Strategy #FutureOfBusiness` : "",
+        ...generatedContent,
+        title: data.title,
+        content: data.content,
+        hashtags: data.hashtags || "",
         status: "draft",
         updated_at: new Date().toISOString(),
         user_id: userId,
         topic: formData.topic,
         tone: formData.tone,
         instructions: regeneratePrompt,
-        versions: [...existingVersions, currentVersion]
+        versions: [...existingVersions, currentVersion],
       };
 
       setGeneratedContent(regeneratedPost);
@@ -220,11 +228,11 @@ What innovative practices have you implemented in your organization?`,
         title: "Content Regenerated",
         description: "Your post has been updated with the new instructions.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error regenerating content:", error);
       toast({
         title: "Regeneration Failed",
-        description: "Failed to regenerate content. Please try again.",
+        description: error?.message || "Failed to regenerate content. Please try again.",
         variant: "destructive",
       });
     } finally {
