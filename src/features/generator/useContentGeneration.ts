@@ -188,29 +188,35 @@ const useContentGeneration = (userId: string | undefined) => {
       // Get existing versions or create a new array
       const existingVersions = generatedContent?.versions || [];
 
-      // In a real implementation, this would call your LLM REST API with the regeneration prompt
-      // For now we're using mock data
+      const previousContent = isEditing ? editedContent : (generatedContent?.content || "");
+
+      const { data, error } = await supabase.functions.invoke("generate-content", {
+        body: {
+          topic: formData.topic,
+          tone: formData.tone,
+          instructions: formData.instructions,
+          includeHashtags: formData.includeHashtags,
+          postLength: formData.postLength,
+          regeneratePrompt,
+          previousContent,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       const regeneratedPost: Partial<ContentPost> = {
-        title: `New Insights: ${formData.topic}`,
-        content: `Based on your request: "${regeneratePrompt}", here's a fresh perspective on ${formData.topic}.
-
-AI-driven research reveals that companies focusing on innovation see a 23% increase in customer loyalty. When we examine the data more carefully:
-
-1. Strategic initiatives correlate strongly with millennial and Gen-Z engagement
-2. Transparent communication increases trust by 37%
-3. Companies with clear innovation roadmaps outperform peers in long-term growth
-
-The key takeaway? Strategic innovation isn't just good for the business - it's becoming essential for market leadership.
-
-What innovative practices have you implemented in your organization?`,
-        hashtags: formData.includeHashtags ? `#Innovation #${formData.topic.replace(/\s+/g, '')} #Leadership #Strategy #FutureOfBusiness` : "",
+        ...generatedContent,
+        title: data.title,
+        content: data.content,
+        hashtags: data.hashtags || "",
         status: "draft",
         updated_at: new Date().toISOString(),
         user_id: userId,
         topic: formData.topic,
         tone: formData.tone,
         instructions: regeneratePrompt,
-        versions: [...existingVersions, currentVersion]
+        versions: [...existingVersions, currentVersion],
       };
 
       setGeneratedContent(regeneratedPost);
