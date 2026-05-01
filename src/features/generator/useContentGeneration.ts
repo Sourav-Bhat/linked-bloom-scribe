@@ -228,11 +228,11 @@ const useContentGeneration = (userId: string | undefined) => {
         title: "Content Regenerated",
         description: "Your post has been updated with the new instructions.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error regenerating content:", error);
       toast({
         title: "Regeneration Failed",
-        description: "Failed to regenerate content. Please try again.",
+        description: error?.message || "Failed to regenerate content. Please try again.",
         variant: "destructive",
       });
     } finally {
