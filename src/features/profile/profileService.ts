@@ -1,58 +1,31 @@
-import { supabase } from '@/integrations/supabase/client';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export const getUserProfile = async (userId: string) => {
-  const { data, error } = await (supabase
-    .from('profiles' as any) as any)
-    .select('*')
-    .eq('id', userId)
-    .single();
-    
-  if (error) throw error;
-  return data as any;
+  const snap = await getDoc(doc(db, 'users', userId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() };
 };
 
 export const saveUserProfile = async (userId: string, data: any) => {
-  const { error } = await (supabase
-    .from('profiles' as any) as any)
-    .upsert({
-      id: userId,
-      ...data,
-      updated_at: new Date().toISOString(),
-    });
-    
-  if (error) throw error;
+  await setDoc(doc(db, 'users', userId), {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
   return true;
 };
 
 export const hasCompletedOnboarding = async (userId: string) => {
-  const { data, error } = await (supabase
-    .from('profiles' as any) as any)
-    .select('onboarding_completed')
-    .eq('id', userId)
-    .single();
-    
-  if (error) return false;
-  return data?.onboarding_completed ?? false;
+  const snap = await getDoc(doc(db, 'users', userId));
+  return snap.data()?.onboardingCompleted ?? false;
 };
 
 export const checkUserCollections = async (userId: string) => {
-  const { data, error } = await (supabase
-    .from('profiles' as any) as any)
-    .select('id')
-    .eq('id', userId)
-    .maybeSingle();
-    
-  if (error) return false;
-  return !!data;
+  const snap = await getDoc(doc(db, 'users', userId));
+  return snap.exists();
 };
 
 export const hasCompletedProfile = async (userId: string) => {
-  const { data, error } = await (supabase
-    .from('profiles' as any) as any)
-    .select('full_name')
-    .eq('id', userId)
-    .maybeSingle();
-    
-  if (error) return false;
-  return !!data?.full_name;
+  const snap = await getDoc(doc(db, 'users', userId));
+  return !!(snap.data()?.fullName);
 };

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getIdToken } from "@/features/auth/authService";
 import { ContentPost, GenerationParams } from '@/lib/types';
 import {
   saveGeneratedContent,
@@ -11,15 +11,13 @@ import {
   getUserContents
 } from '@/features/generator/contentService';
 
-/**
- * Custom hook for content generation functionality
- */
+const GENERATE_URL = `${import.meta.env.VITE_CLOUD_FUNCTIONS_BASE_URL}/generateContent`;
+
 const useContentGeneration = (userId: string | undefined) => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const editPostId = searchParams.get('edit');
 
-  // Form and content states
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<Partial<ContentPost> | null>(null);
@@ -31,8 +29,7 @@ const useContentGeneration = (userId: string | undefined) => {
     includeHashtags: true,
     postLength: "medium",
   });
-  
-  // Edit states
+
   const [regeneratePrompt, setRegeneratePrompt] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
@@ -40,7 +37,6 @@ const useContentGeneration = (userId: string | undefined) => {
   const [editedHashtags, setEditedHashtags] = useState("");
   const [editMode, setEditMode] = useState(false);
 
-  // Load existing content if in edit mode
   useEffect(() => {
     async function loadEditContent() {
       if (userId && editPostId) {
@@ -49,12 +45,10 @@ const useContentGeneration = (userId: string | undefined) => {
         try {
           const postData = await getContent(userId, editPostId);
           if (postData) {
-            // Create a type-safe version of the post data
             const typedPostData: Partial<ContentPost> = {
               ...postData,
               status: postData.status as ContentPost['status']
             };
-            
             setGeneratedContent(typedPostData);
             setEditedTitle(typedPostData.title || "");
             setEditedContent(typedPostData.content || "");
@@ -80,11 +74,9 @@ const useContentGeneration = (userId: string | undefined) => {
         }
       }
     }
-    
     loadEditContent();
   }, [userId, editPostId, toast]);
 
-  // Load drafts
   useEffect(() => {
     async function loadDrafts() {
       if (userId) {
@@ -104,7 +96,6 @@ const useContentGeneration = (userId: string | undefined) => {
     loadDrafts();
   }, [userId, toast]);
 
-  // Form handlers
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -119,34 +110,44 @@ const useContentGeneration = (userId: string | undefined) => {
     setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
-  // Submit handlers
+  const callGenerateContent = async (body: object) => {
+    const token = await getIdToken();
+    const res = await fetch(GENERATE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Request failed (${res.status})`);
+    }
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error);
+    return data;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
 
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-content", {
-        body: {
-          topic: formData.topic,
-          tone: formData.tone,
-          instructions: formData.instructions,
-          includeHashtags: formData.includeHashtags,
-          postLength: formData.postLength,
-        },
+      const data = await callGenerateContent({
+        topic: formData.topic,
+        tone: formData.tone,
+        instructions: formData.instructions,
+        includeHashtags: formData.includeHashtags,
+        postLength: formData.postLength,
       });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
       const generatedPost: Partial<ContentPost> = {
         title: data.title,
         content: data.content,
         hashtags: data.hashtags || "",
         status: "draft",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        user_id: userId,
         topic: formData.topic,
         tone: formData.tone,
         instructions: formData.instructions,
@@ -172,38 +173,30 @@ const useContentGeneration = (userId: string | undefined) => {
       setIsGenerating(false);
     }
   };
-  
+
   const handleRegenerateContent = async () => {
     if (!userId) return;
-    
+
     setIsGenerating(true);
     try {
-      // Save current version before regenerating
       const currentVersion = {
         date: new Date().toISOString(),
         content: isEditing ? editedContent : (generatedContent?.content || ""),
         hashtags: isEditing ? editedHashtags : (generatedContent?.hashtags || ""),
       };
 
-      // Get existing versions or create a new array
       const existingVersions = generatedContent?.versions || [];
-
       const previousContent = isEditing ? editedContent : (generatedContent?.content || "");
 
-      const { data, error } = await supabase.functions.invoke("generate-content", {
-        body: {
-          topic: formData.topic,
-          tone: formData.tone,
-          instructions: formData.instructions,
-          includeHashtags: formData.includeHashtags,
-          postLength: formData.postLength,
-          regeneratePrompt,
-          previousContent,
-        },
+      const data = await callGenerateContent({
+        topic: formData.topic,
+        tone: formData.tone,
+        instructions: formData.instructions,
+        includeHashtags: formData.includeHashtags,
+        postLength: formData.postLength,
+        regeneratePrompt,
+        previousContent,
       });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
       const regeneratedPost: Partial<ContentPost> = {
         ...generatedContent,
@@ -211,8 +204,6 @@ const useContentGeneration = (userId: string | undefined) => {
         content: data.content,
         hashtags: data.hashtags || "",
         status: "draft",
-        updated_at: new Date().toISOString(),
-        user_id: userId,
         topic: formData.topic,
         tone: formData.tone,
         instructions: regeneratePrompt,
@@ -242,14 +233,13 @@ const useContentGeneration = (userId: string | undefined) => {
 
   const handleSaveContent = async () => {
     if (!userId || !generatedContent) return;
-    
+
     try {
       const contentToSave = isEditing ? {
         ...generatedContent,
         title: editedTitle,
         content: editedContent,
         hashtags: editedHashtags,
-        updated_at: new Date().toISOString(),
         topic: formData.topic,
         tone: formData.tone,
         instructions: formData.instructions,
@@ -261,26 +251,15 @@ const useContentGeneration = (userId: string | undefined) => {
         instructions: formData.instructions,
         postLength: formData.postLength
       };
-      
+
       if (editMode && editPostId) {
-        // Update existing content
         await updateContent(userId, editPostId, contentToSave);
-        
-        toast({ 
-          title: "Post Updated", 
-          description: "Your content has been updated successfully." 
-        });
+        toast({ title: "Post Updated", description: "Your content has been updated successfully." });
       } else {
-        // Save new content
         await saveGeneratedContent(userId, contentToSave);
-        
-        toast({ 
-          title: "Draft Saved", 
-          description: "Your content has been saved as a draft." 
-        });
+        toast({ title: "Draft Saved", description: "Your content has been saved as a draft." });
       }
-      
-      // Reset state after saving
+
       setGeneratedContent(null);
       setEditedTitle("");
       setEditedContent("");
@@ -294,8 +273,7 @@ const useContentGeneration = (userId: string | undefined) => {
         includeHashtags: true,
         postLength: "medium",
       });
-      
-      // Reload drafts
+
       const updatedDrafts = await getUserContents(userId);
       setDrafts(updatedDrafts as ContentPost[]);
     } catch (error) {
@@ -308,7 +286,6 @@ const useContentGeneration = (userId: string | undefined) => {
     }
   };
 
-  // UI state handlers
   const toggleEditMode = () => {
     if (!isEditing && generatedContent) {
       setEditedTitle(generatedContent.title || "");

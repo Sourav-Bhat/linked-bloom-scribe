@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  collection, getDocs, deleteDoc, addDoc, query, orderBy,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { getIdToken } from '@/features/auth/authService';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +13,7 @@ import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pr-agent-chat`;
+const CHAT_URL = `${import.meta.env.VITE_CLOUD_FUNCTIONS_BASE_URL}/prAgentChat`;
 
 interface PrAgentChatProps {
   userId: string;
@@ -22,20 +26,23 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load conversation history
   useEffect(() => {
     const loadHistory = async () => {
-      const { data, error } = await (supabase
-        .from("chat_messages" as any) as any)
-        .select("role, content")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: true })
-        .limit(50);
-
-      if (!error && data?.length) {
-        setMessages(data.map((m: any) => ({ role: m.role, content: m.content })));
+      try {
+        const q = query(
+          collection(db, 'users', userId, 'chatMessages'),
+          orderBy('createdAt', 'asc'),
+        );
+        const snap = await getDocs(q);
+        const msgs = snap.docs
+          .slice(-50)
+          .map((d) => ({ role: d.data().role, content: d.data().content } as Msg));
+        if (msgs.length) setMessages(msgs);
+      } catch {
+        // history unavailable — start fresh
+      } finally {
+        setHistoryLoaded(true);
       }
-      setHistoryLoaded(true);
     };
     loadHistory();
   }, [userId]);
@@ -45,9 +52,8 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
   }, [messages]);
 
   const clearHistory = async () => {
-    await (supabase.from("chat_messages" as any) as any)
-      .delete()
-      .eq("user_id", userId);
+    const snap = await getDocs(collection(db, 'users', userId, 'chatMessages'));
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
     setMessages([]);
     toast({ title: "Conversation cleared" });
   };
@@ -77,14 +83,13 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
     };
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getIdToken();
 
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ messages: [userMsg] }),
       });
@@ -127,14 +132,23 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
           }
         }
       }
+
+      // Persist both messages to Firestore
+      const ts = new Date().toISOString();
+      await addDoc(collection(db, 'users', userId, 'chatMessages'), {
+        role: 'user', content: text, createdAt: ts,
+      });
+      if (assistantSoFar) {
+        await addDoc(collection(db, 'users', userId, 'chatMessages'), {
+          role: 'assistant', content: assistantSoFar, createdAt: new Date().toISOString(),
+        });
+      }
     } catch (e: any) {
-      console.error("Chat error:", e);
       toast({
         title: "Message failed",
         description: e.message || "Please try again.",
         variant: "destructive",
       });
-      // Remove failed user message if no assistant response came
       if (!assistantSoFar) {
         setMessages((prev) => prev.slice(0, -1));
       }
@@ -162,7 +176,6 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
 
   return (
     <div className="flex flex-col h-[600px] border rounded-lg bg-background overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Your PR Agent</h3>
@@ -175,7 +188,6 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
         )}
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
@@ -191,9 +203,7 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
                 ].map((suggestion) => (
                   <button
                     key={suggestion}
-                    onClick={() => {
-                      setInput(suggestion);
-                    }}
+                    onClick={() => setInput(suggestion)}
                     className="text-xs px-3 py-1.5 rounded-full border border-input text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
                   >
                     {suggestion}
@@ -205,10 +215,7 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
         )}
 
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
+          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
                 msg.role === "user"
@@ -242,7 +249,6 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="border-t p-3">
         <div className="flex gap-2">
           <Textarea

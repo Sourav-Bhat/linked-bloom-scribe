@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import useAuth from "@/features/auth/useAuth";
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface ContentPillar {
   title: string;
@@ -80,12 +82,15 @@ const ErrorState = ({ onRetry }: { onRetry: () => void }) => (
 
 const PersonaSummary = ({ persona, isLoading, error, onRetry }: PersonaSummaryProps) => {
   const navigate = useNavigate();
-  const { setOnboardingCompleted } = useAuth();
+  const { user, setOnboardingCompleted } = useAuth();
 
   if (isLoading) return <LoadingState />;
   if (error || !persona) return <ErrorState onRetry={onRetry} />;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (user) {
+      await setDoc(doc(db, 'users', user.uid), { onboardingCompleted: true }, { merge: true });
+    }
     setOnboardingCompleted?.(true);
     navigate("/");
   };

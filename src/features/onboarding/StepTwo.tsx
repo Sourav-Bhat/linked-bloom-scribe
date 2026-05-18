@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/select";
 import { Plus, X, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
+import { getAuth } from 'firebase/auth';
 import { toast } from "@/components/ui/use-toast";
 
 export interface AdmiredPost {
@@ -49,10 +51,8 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
     const current = data.topics;
     if (current.includes(topic)) {
       onChange({ ...data, topics: current.filter((t) => t !== topic) });
-    } else {
-      if (current.length < 5) {
-        onChange({ ...data, topics: [...current, topic] });
-      }
+    } else if (current.length < 5) {
+      onChange({ ...data, topics: [...current, topic] });
     }
   };
 
@@ -74,24 +74,16 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
 
   const handleImageUpload = async (index: number, file: File) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const uid = getAuth().currentUser?.uid;
+      if (!uid) return;
 
       const ext = file.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("admired-posts")
-        .upload(path, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("admired-posts")
-        .getPublicUrl(path);
+      const storageRef = ref(storage, `admiredPosts/${uid}/${Date.now()}.${ext}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
 
       const posts = [...data.admiredPosts];
-      posts[index] = { ...posts[index], imageUrl: urlData.publicUrl };
+      posts[index] = { ...posts[index], imageUrl: downloadURL };
       onChange({ ...data, admiredPosts: posts });
     } catch (err) {
       console.error("Upload error:", err);
@@ -115,7 +107,6 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
       </div>
 
       <div className="space-y-5">
-        {/* Topics */}
         <div className="space-y-3">
           <Label>Content Topics (select 3 to 5)</Label>
           <div className="flex flex-wrap gap-2">
@@ -140,7 +131,6 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
           {errors.topics && <p className="text-sm text-destructive">{errors.topics}</p>}
         </div>
 
-        {/* Admired Posts */}
         <div className="space-y-3">
           <Label>Share up to 3 LinkedIn posts you wish you had written</Label>
           <p className="text-xs text-muted-foreground">Paste a URL or upload a screenshot of the post</p>
@@ -182,7 +172,6 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
                 )}
               </div>
 
-              {/* Image preview */}
               {post.imageUrl && (
                 <div className="relative inline-block">
                   <img
@@ -226,7 +215,6 @@ const StepTwo = ({ data, onChange, errors }: StepTwoProps) => {
           )}
         </div>
 
-        {/* No-Go Topic */}
         <div className="space-y-2">
           <Label htmlFor="noGoTopic">Is there any topic you never want associated with your name?</Label>
           <Input

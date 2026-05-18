@@ -14,7 +14,11 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
+import { getAuth } from 'firebase/auth';
+import { getIdToken } from '@/features/auth/authService';
 import { Plus, X, ImagePlus } from "lucide-react";
 
 interface AdmiredPost {
@@ -84,9 +88,9 @@ const STANDOUT_OPTIONS = [
   "Inspiring", "Contrarian", "Storytelling", "Practical advice",
 ];
 
-export const ProfileForm = ({
-  userId,
-}: ProfileFormProps) => {
+const PERSONA_AGENT_URL = `${import.meta.env.VITE_CLOUD_FUNCTIONS_BASE_URL}/personaAgent`;
+
+export const ProfileForm = ({ userId }: ProfileFormProps) => {
   const [persona, setPersona] = useState<PersonaData>({
     linkedin_url: "",
     industry: "",
@@ -117,29 +121,24 @@ export const ProfileForm = ({
   useEffect(() => {
     async function loadPersona() {
       try {
-        const { data, error } = await (supabase
-          .from("personas" as any) as any)
-          .select("*")
-          .eq("user_id", userId)
-          .single();
-
-        if (error) throw error;
-        if (data) {
+        const snap = await getDoc(doc(db, 'users', userId, 'persona', 'main'));
+        if (snap.exists()) {
+          const d = snap.data();
           setPersona({
-            linkedin_url: data.linkedin_url || "",
-            industry: data.industry || "",
-            experience_range: data.experience_range || "",
-            location: data.location || "",
-            future_goal: data.future_goal || "",
-            topics: data.topics || [],
-            admired_posts: (data.admired_posts as AdmiredPost[])?.length
-              ? (data.admired_posts as AdmiredPost[])
+            linkedin_url: d.linkedinUrl || "",
+            industry: d.industry || "",
+            experience_range: d.experienceRange || "",
+            location: d.location || "",
+            future_goal: d.futureGoal || "",
+            topics: d.topics || [],
+            admired_posts: (d.admiredPosts as AdmiredPost[])?.length
+              ? (d.admiredPosts as AdmiredPost[])
               : [{ url: "", standout: "" }],
-            no_go_topic: data.no_go_topic || "",
-            posts_per_week: data.posts_per_week,
-            preferred_days: data.preferred_days || [],
-            tone: data.tone || "",
-            archetype: data.archetype || "",
+            no_go_topic: d.noGoTopic || "",
+            posts_per_week: d.postsPerWeek ?? null,
+            preferred_days: d.preferredDays || [],
+            tone: d.tone || "",
+            archetype: d.archetype || "",
           });
         }
       } catch (error) {
@@ -201,16 +200,15 @@ export const ProfileForm = ({
 
   const handleImageUpload = async (index: number, file: File) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const uid = getAuth().currentUser?.uid;
+      if (!uid) return;
       const ext = file.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("admired-posts").upload(path, file);
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from("admired-posts").getPublicUrl(path);
+      const storageRef = ref(storage, `admiredPosts/${uid}/${Date.now()}.${ext}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
       setPersona((prev) => {
         const posts = [...prev.admired_posts];
-        posts[index] = { ...posts[index], imageUrl: urlData.publicUrl };
+        posts[index] = { ...posts[index], imageUrl: downloadURL };
         return { ...prev, admired_posts: posts };
       });
     } catch (err) {
@@ -231,43 +229,34 @@ export const ProfileForm = ({
     e.preventDefault();
     setSaving(true);
     try {
-      const { error } = await (supabase
-        .from("personas" as any) as any)
-        .upsert({
-          user_id: userId,
-          linkedin_url: persona.linkedin_url,
-          industry: persona.industry,
-          experience_range: persona.experience_range,
-          location: persona.location,
-          future_goal: persona.future_goal,
-          topics: persona.topics,
-          admired_posts: persona.admired_posts.filter((p) => p.url.trim() || p.imageUrl),
-          no_go_topic: persona.no_go_topic,
-          posts_per_week: persona.posts_per_week,
-          preferred_days: persona.preferred_days,
-          tone: persona.tone,
-          archetype: persona.archetype,
-        }, { onConflict: 'user_id' });
+      const filteredPosts = persona.admired_posts.filter((p) => p.url.trim() || p.imageUrl);
 
-      if (error) throw error;
-
-      // Also sync key fields to profiles
-      await supabase
-        .from("profiles")
-        .update({
-          industry: persona.industry,
-          topics: persona.topics,
-          posts_per_week: persona.posts_per_week,
-          tone: persona.tone,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId);
+      await setDoc(doc(db, 'users', userId, 'persona', 'main'), {
+        linkedinUrl: persona.linkedin_url,
+        industry: persona.industry,
+        experienceRange: persona.experience_range,
+        location: persona.location,
+        futureGoal: persona.future_goal,
+        topics: persona.topics,
+        admiredPosts: filteredPosts,
+        noGoTopic: persona.no_go_topic,
+        postsPerWeek: persona.posts_per_week,
+        preferredDays: persona.preferred_days,
+        tone: persona.tone,
+        archetype: persona.archetype,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
 
       toast({ title: "Profile saved!", description: "Regenerating your persona..." });
 
-      // Regenerate persona using the edge function
-      const { data: result, error: fnError } = await supabase.functions.invoke("persona-agent", {
-        body: {
+      const token = await getIdToken();
+      const res = await fetch(PERSONA_AGENT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           onboardingData: {
             industry: persona.industry,
             experienceRange: persona.experience_range,
@@ -275,18 +264,17 @@ export const ProfileForm = ({
             futureGoal: persona.future_goal,
             linkedinUrl: persona.linkedin_url,
             topics: persona.topics,
-            admiredPosts: persona.admired_posts.filter((p) => p.url.trim() || p.imageUrl),
+            admiredPosts: filteredPosts,
             noGoTopic: persona.no_go_topic,
             postsPerWeek: persona.posts_per_week,
             preferredDays: persona.preferred_days,
             tone: persona.tone,
           },
-        },
+        }),
       });
 
-      if (fnError) {
-        console.error("Persona generation error:", fnError);
-        toast({ title: "Profile saved", description: "But persona regeneration failed. You can regenerate it from the My Persona tab.", variant: "destructive" });
+      if (!res.ok) {
+        toast({ title: "Profile saved", description: "But persona regeneration failed. Regenerate it from the My Persona tab.", variant: "destructive" });
       } else {
         toast({ title: "Persona updated!", description: "Your LinkedIn strategy has been refreshed." });
       }
@@ -455,7 +443,7 @@ export const ProfileForm = ({
             <div className="space-y-3">
               <Label>Admired LinkedIn Posts</Label>
               {persona.admired_posts.map((post, idx) => (
-              <div key={idx} className="p-4 rounded-lg border border-input bg-background space-y-3">
+                <div key={idx} className="p-4 rounded-lg border border-input bg-background space-y-3">
                   <div className="flex items-start gap-2">
                     <Input
                       value={post.url}
