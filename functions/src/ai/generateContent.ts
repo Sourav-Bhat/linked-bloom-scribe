@@ -1,0 +1,65 @@
+import * as admin from 'firebase-admin';
+import { onRequest } from 'firebase-functions/v2/https';
+import { Request, Response } from 'express';
+import { verifyToken } from '../middleware/verifyToken';
+import { LOVABLE_API_KEY, callLovableGateway } from '../utils/geminiClient';
+
+const handler = async (req: Request, res: Response): Promise<void> => {
+  if (req.method !== 'POST') { res.status(405).end(); return; }
+
+  await new Promise<void>((resolve, reject) =>
+    verifyToken(req, res, (err?: any) => (err ? reject(err) : resolve()))
+  );
+  if (res.headersSent) return;
+
+  const uid: string = (req as any).uid;
+  const { topic, tone, instructions, includeHashtags, postLength, regeneratePrompt, previousContent } = req.body;
+
+  // Load persona context
+  let personaContext = '';
+  try {
+    const snap = await admin.firestore().doc(`users/${uid}/persona/main`).get();
+    if (snap.exists) {
+      const d = snap.data()!;
+      personaContext = `User persona: industry=${d.industry}, tone=${d.tone}, topics=${(d.topics || []).join(', ')}.`;
+    }
+  } catch { /* persona optional */ }
+
+  const lengthGuide = postLength === 'short' ? '150-300 words' : postLength === 'long' ? '600-900 words' : '300-500 words';
+
+  const systemPrompt = [
+    'You are an expert LinkedIn content creator.',
+    personaContext,
+    `Write a ${tone} LinkedIn post about: ${topic}.`,
+    `Target length: ${lengthGuide}.`,
+    instructions ? `Additional instructions: ${instructions}.` : '',
+    includeHashtags ? 'End with 3-5 relevant hashtags.' : 'Do not include hashtags.',
+    previousContent ? `Previous version to improve:\n${previousContent}\nImprovement request: ${regeneratePrompt || 'improve it'}` : '',
+    'Return valid JSON: { "title": "...", "content": "...", "hashtags": "..." }',
+  ].filter(Boolean).join(' ');
+
+  const apiKey = LOVABLE_API_KEY.value();
+  const gatewayRes = await callLovableGateway(apiKey, [{ role: 'user', content: 'Generate content as instructed.' }], systemPrompt);
+
+  if (!gatewayRes.ok) {
+    const err = await gatewayRes.text();
+    res.status(502).json({ error: `AI gateway error: ${err}` });
+    return;
+  }
+
+  const data = await gatewayRes.json() as any;
+  const text: string = data.choices?.[0]?.message?.content || '';
+
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch![0]);
+    res.json(parsed);
+  } catch {
+    res.json({ title: topic, content: text, hashtags: '' });
+  }
+};
+
+export const generateContent = onRequest(
+  { secrets: [LOVABLE_API_KEY], cors: true },
+  handler as any,
+);
