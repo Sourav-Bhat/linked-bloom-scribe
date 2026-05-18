@@ -1,60 +1,31 @@
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User,
+} from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
 
-import { supabase } from '@/integrations/supabase/client';
-import { User } from '@supabase/supabase-js';
+export const signInWithEmail = (email: string, password: string) =>
+  signInWithEmailAndPassword(auth, email, password);
 
-// Sign in with email and password
-export const signInWithEmail = async (email: string, password: string) => {
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (error) throw error;
-    return data.user;
-  } catch (error) {
-    console.error("Auth error during sign in:", error);
-    throw error;
-  }
-};
+export const registerWithEmail = (email: string, password: string) =>
+  createUserWithEmailAndPassword(auth, email, password);
 
-// Register with email and password
-export const registerWithEmail = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-  
-  if (error) throw error;
-  return data.user;
-};
+export const signInWithGoogle = () =>
+  signInWithPopup(auth, googleProvider);
 
-// Sign in with Google
-export const signInWithGoogle = async () => {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-  });
-  
-  if (error) throw error;
-  return data;
-};
+export const signOut = () => firebaseSignOut(auth);
 
-// Sign out
-export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-};
+export const onAuthStateChange = (cb: (user: User | null) => void) =>
+  onAuthStateChanged(auth, cb);
 
-// Auth state observer
-export const onAuthStateChange = (callback: (user: User | null) => void) => {
-  return supabase.auth.onAuthStateChange((event, session) => {
-    callback(session?.user ?? null);
-  });
-};
+export const getCurrentUser = () => auth.currentUser;
 
-// Check if current user is authenticated
-export const getCurrentUser = async () => {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) return null;
-  return data.user;
+export const getIdToken = async (): Promise<string | null> => {
+  const user = auth.currentUser;
+  if (!user) return null;
+  return user.getIdToken();
 };
