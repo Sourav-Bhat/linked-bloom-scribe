@@ -30,11 +30,11 @@ const Profile = () => {
         </TabsList>
 
         <TabsContent value="persona">
-          <PersonaDisplay userId={user.id} />
+          <PersonaDisplay userId={user.uid} />
         </TabsContent>
 
         <TabsContent value="agent">
-          <PrAgentChat userId={user.id} />
+          <PrAgentChat userId={user.uid} />
         </TabsContent>
 
         <TabsContent value="settings">
@@ -44,7 +44,7 @@ const Profile = () => {
             topicsInput=""
             setTopicsInput={() => {}}
             isNewProfile={false}
-            userId={user.id}
+            userId={user.uid}
           />
         </TabsContent>
 

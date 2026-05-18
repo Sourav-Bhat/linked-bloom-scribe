@@ -42,18 +42,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
-    // Clear any stored state that might be causing issues
-    try {
-      localStorage.removeItem('supabase.auth.token');
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-          localStorage.removeItem(key);
-        }
-      });
-    } catch (e) {
-      console.warn('Error clearing localStorage:', e);
-    }
-    
     window.location.reload();
   };
 

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { getIdToken } from '@/features/auth/authService';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +38,8 @@ interface PersonaDisplayProps {
   userId: string;
 }
 
+const PERSONA_AGENT_URL = `${import.meta.env.VITE_CLOUD_FUNCTIONS_BASE_URL}/personaAgent`;
+
 const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
   const [persona, setPersona] = useState<PersonaData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,15 +51,9 @@ const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
 
   const loadPersona = async () => {
     try {
-      const { data, error } = await (supabase
-        .from("personas" as any) as any)
-        .select("persona_data")
-        .eq("user_id", userId)
-        .single();
-
-      if (error) throw error;
-      if (data?.persona_data) {
-        setPersona(data.persona_data as PersonaData);
+      const snap = await getDoc(doc(db, 'users', userId, 'persona', 'main'));
+      if (snap.exists() && snap.data()?.personaData) {
+        setPersona(snap.data().personaData as PersonaData);
       }
     } catch (err) {
       console.error("Error loading persona:", err);
@@ -67,33 +65,35 @@ const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
   const handleRegenerate = async () => {
     setRegenerating(true);
     try {
-      // Load current onboarding data
-      const { data: personaRow, error } = await (supabase
-        .from("personas" as any) as any)
-        .select("*")
-        .eq("user_id", userId)
-        .single();
+      const snap = await getDoc(doc(db, 'users', userId, 'persona', 'main'));
+      if (!snap.exists()) throw new Error("Could not load profile data");
 
-      if (error || !personaRow) throw new Error("Could not load profile data");
-
-      const { data: result, error: fnError } = await supabase.functions.invoke("persona-agent", {
-        body: {
-          onboardingData: {
-            industry: personaRow.industry,
-            experienceRange: personaRow.experience_range,
-            location: personaRow.location,
-            futureGoal: personaRow.future_goal,
-            topics: personaRow.topics,
-            admiredPosts: personaRow.admired_posts || [],
-            noGoTopic: personaRow.no_go_topic || "",
-            postsPerWeek: personaRow.posts_per_week,
-            preferredDays: personaRow.preferred_days,
-            tone: personaRow.tone,
-          },
+      const d = snap.data();
+      const token = await getIdToken();
+      const res = await fetch(PERSONA_AGENT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          onboardingData: {
+            industry: d.industry,
+            experienceRange: d.experienceRange,
+            location: d.location,
+            futureGoal: d.futureGoal,
+            topics: d.topics,
+            admiredPosts: d.admiredPosts || [],
+            noGoTopic: d.noGoTopic || "",
+            postsPerWeek: d.postsPerWeek,
+            preferredDays: d.preferredDays,
+            tone: d.tone,
+          },
+        }),
       });
 
-      if (fnError) throw fnError;
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const result = await res.json();
       if (result?.persona) {
         setPersona(result.persona);
         toast({ title: "Persona regenerated!", description: "Your LinkedIn strategy has been updated." });
@@ -128,7 +128,6 @@ const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Archetype */}
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-start justify-between">
@@ -151,7 +150,6 @@ const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
         </CardContent>
       </Card>
 
-      {/* Content Pillars */}
       <Card>
         <CardContent className="pt-6 space-y-5">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-[0.15em]">
@@ -177,7 +175,6 @@ const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
         </CardContent>
       </Card>
 
-      {/* Posting Rhythm */}
       <Card>
         <CardContent className="pt-6 space-y-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-[0.15em]">
@@ -199,7 +196,6 @@ const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
         </CardContent>
       </Card>
 
-      {/* Voice Profile */}
       <Card>
         <CardContent className="pt-6 space-y-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-[0.15em]">

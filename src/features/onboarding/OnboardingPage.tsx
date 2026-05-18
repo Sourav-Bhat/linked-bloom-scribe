@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import useAuth from "@/features/auth/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { getIdToken } from "@/features/auth/authService";
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import StepOne, { type StepOneData } from "@/features/onboarding/StepOne";
 import StepTwo, { type StepTwoData } from "@/features/onboarding/StepTwo";
 import StepThree, { type StepThreeData } from "@/features/onboarding/StepThree";
@@ -11,6 +13,8 @@ import PersonaSummary from "@/features/onboarding/PersonaSummary";
 import { ArrowLeft } from "lucide-react";
 
 type Screen = "step1" | "step2" | "step3" | "summary";
+
+const PERSONA_AGENT_URL = `${import.meta.env.VITE_CLOUD_FUNCTIONS_BASE_URL}/personaAgent`;
 
 const Onboarding = () => {
   const { user } = useAuth();
@@ -106,15 +110,31 @@ const Onboarding = () => {
       tone: stepThree.tone,
     };
 
+    // Persist onboarding data to Firestore before calling the function
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await supabase.functions.invoke("persona-agent", {
-        body: { onboardingData, userId: user.id },
+      await setDoc(
+        doc(db, 'users', user.uid, 'persona', 'main'),
+        { ...onboardingData, updatedAt: new Date().toISOString() },
+        { merge: true },
+      );
+    } catch {
+      // non-fatal — continue
+    }
+
+    try {
+      const token = await getIdToken();
+      const res = await fetch(PERSONA_AGENT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ onboardingData, userId: user.uid }),
       });
 
-      if (res.error) throw new Error(res.error.message || "API call failed");
-      
-      const responseData = res.data;
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const responseData = await res.json();
+
       if (responseData?.persona) {
         setPersonaData(responseData.persona);
       } else {

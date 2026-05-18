@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { Calendar as CalendarIcon, Clock, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from '@/integrations/supabase/client';
 import { ContentPost } from '@/lib/types';
 import { 
   Dialog,
@@ -103,15 +102,6 @@ const Calendar = () => {
     if (!postToDelete) return;
     
     try {
-      // In a real app, we would delete from Supabase
-      // const { error } = await supabase
-      //   .from('posts')
-      //   .delete()
-      //   .eq('id', postToDelete);
-      
-      // if (error) throw error;
-
-      // For mock data, filter out the deleted post
       setScheduledContent(scheduledContent.filter(post => post.id !== postToDelete));
       
       toast({
@@ -147,15 +137,6 @@ const Calendar = () => {
           : post
       )
     );
-
-    // In a real app, we would update in Supabase
-    // const { error } = await supabase
-    //   .from('posts')
-    //   .update({ 
-    //     status: newStatus,
-    //     scheduled_date: newStatus === 'scheduled' ? new Date().toISOString() : null
-    //   })
-    //   .eq('id', postId);
 
     toast({
       title: `Post ${newStatus}`,

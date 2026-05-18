@@ -24,11 +24,11 @@ const Dashboard = () => {
         setLoading(true);
         
         // Load user profile
-        const profileData = await getUserProfile(user.id);
+        const profileData = await getUserProfile(user.uid);
         setProfile(profileData);
-        
+
         // Load user content
-        const postsData = await getUserContents(user.id);
+        const postsData = await getUserContents(user.uid);
         setPosts(postsData);
       } catch (error) {
         console.error("Error loading dashboard data:", error);

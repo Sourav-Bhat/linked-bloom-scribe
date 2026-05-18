@@ -44,14 +44,13 @@ const Generator = () => {
     handleRegenerateContent,
     handleSaveContent,
     toggleEditMode
-  } = useContentGeneration(user?.id);
+  } = useContentGeneration(user?.uid);
 
-  // Handler for finalizing a draft
   const handleFinalizeDraft = async (id: string) => {
     if (!user) return;
-    
+
     try {
-      await updateContentStatus(user.id, id, "final");
+      await updateContentStatus(user.uid, id, "final");
       toast({ 
         title: "Draft Finalized", 
         description: "The draft is now marked as final." 
