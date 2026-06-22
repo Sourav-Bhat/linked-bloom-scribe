@@ -53,4 +53,6 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Deploy to Firebase (Hosting + Functions + Firestore/Storage rules)
-        run: npx firebase-tools@15.22.0 deploy --project contentmanager-ed707 --non-interactive
+        # --force lets the non-interactive deploy auto-create the Artifact Registry
+        # cleanup policy for function images instead of prompting for it.
+        run: npx firebase-tools@15.22.0 deploy --project contentmanager-ed707 --non-interactive --force
