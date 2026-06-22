@@ -1,27 +1,53 @@
-import { defineSecret } from 'firebase-functions/params';
+import { GoogleGenAI } from '@google/genai';
 
-export const LOVABLE_API_KEY = defineSecret('LOVABLE_API_KEY');
+const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+const LOCATION = 'us-central1';
 
-export const callLovableGateway = async (
-  apiKey: string,
+// Allowlist of Gemini models callers may request. Keep this in sync with
+// what's actually available in Vertex AI for LOCATION above.
+export const SUPPORTED_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.0-flash-001',
+] as const;
+
+export type GeminiModel = (typeof SUPPORTED_MODELS)[number];
+
+export const DEFAULT_MODEL: GeminiModel = 'gemini-2.5-flash';
+
+const resolveModel = (requested?: string): GeminiModel =>
+  (SUPPORTED_MODELS as readonly string[]).includes(requested ?? '')
+    ? (requested as GeminiModel)
+    : DEFAULT_MODEL;
+
+const ai = new GoogleGenAI({ vertexai: true, project: PROJECT_ID, location: LOCATION });
+
+export const generateText = async (
+  systemPrompt: string,
+  userMessage: string,
+  model?: string,
+): Promise<string> => {
+  const result = await ai.models.generateContent({
+    model: resolveModel(model),
+    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    config: { systemInstruction: systemPrompt },
+  });
+  return result.text ?? '';
+};
+
+export const streamChat = async (
+  systemPrompt: string,
   messages: Array<{ role: string; content: string }>,
-  systemPrompt?: string,
-  stream = false,
-): Promise<Response> => {
-  const body: Record<string, unknown> = {
-    model: 'gemini-2.0-flash',
-    messages: systemPrompt
-      ? [{ role: 'system', content: systemPrompt }, ...messages]
-      : messages,
-    stream,
-  };
+  model?: string,
+): Promise<AsyncIterable<{ text?: string }>> => {
+  const contents = messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
 
-  return fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
+  return ai.models.generateContentStream({
+    model: resolveModel(model),
+    contents,
+    config: { systemInstruction: systemPrompt },
   });
 };

@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
-import { LOVABLE_API_KEY, callLovableGateway } from '../utils/geminiClient';
+import { generateText } from '../utils/geminiClient';
 
 const handler = async (req: Request, res: Response): Promise<void> => {
   if (req.method !== 'POST') { res.status(405).end(); return; }
@@ -13,7 +13,7 @@ const handler = async (req: Request, res: Response): Promise<void> => {
   if (res.headersSent) return;
 
   const uid: string = (req as any).uid;
-  const { onboardingData } = req.body;
+  const { onboardingData, model } = req.body;
 
   const systemPrompt = `You are a LinkedIn personal branding expert.
 Based on this professional profile, generate a comprehensive LinkedIn persona strategy.
@@ -41,21 +41,13 @@ Return valid JSON with this exact structure:
   }
 }`;
 
-  const apiKey = LOVABLE_API_KEY.value();
-  const gatewayRes = await callLovableGateway(
-    apiKey,
-    [{ role: 'user', content: 'Generate my LinkedIn persona strategy.' }],
-    systemPrompt,
-  );
-
-  if (!gatewayRes.ok) {
-    const err = await gatewayRes.text();
-    res.status(502).json({ error: `AI gateway error: ${err}` });
+  let text: string;
+  try {
+    text = await generateText(systemPrompt, 'Generate my LinkedIn persona strategy.', model);
+  } catch (err: any) {
+    res.status(502).json({ error: `Gemini error: ${err.message || err}` });
     return;
   }
-
-  const data = await gatewayRes.json() as any;
-  const text: string = data.choices?.[0]?.message?.content || '';
 
   let persona: any;
   try {
@@ -85,6 +77,6 @@ Return valid JSON with this exact structure:
 };
 
 export const personaAgent = onRequest(
-  { secrets: [LOVABLE_API_KEY], cors: true },
+  { cors: true, serviceAccount: 'firebase-adminsdk-fbsvc@contentmanager-ed707.iam.gserviceaccount.com' },
   handler as any,
 );

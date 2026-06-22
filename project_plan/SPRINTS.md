@@ -437,10 +437,10 @@ Please:
 
 ## Known Technical Context for Claude Code
 
-### Existing Architecture (post-migration, see TRD.md v2.0)
-- **Frontend:** React + TypeScript + Vite + Tailwind + shadcn-ui, originally scaffolded via Lovable
+### Existing Architecture (post-migration, see TRD.md v2.1)
+- **Frontend:** React + TypeScript + Vite + Tailwind + shadcn-ui
 - **Backend:** Firebase — Firestore, Auth, Cloud Functions (Node.js 20, 2nd gen), Storage, Cloud Scheduler
-- **AI Model:** Gemini 2.5 Pro, via the Lovable AI Gateway (existing Cloud Functions already use this)
+- **AI Model:** Gemini via Vertex AI (same GCP project, no API key) — model selectable per-request from an allowlist in `geminiClient.ts`
 - **Existing Cloud Functions:** generateContent, personaAgent, prAgentChat
 - **Existing Firestore Collections:** `users/{uid}` (profile), `users/{uid}/persona/main`, `users/{uid}/posts`, `users/{uid}/chatMessages`
 - **Existing Storage Paths:** `admiredPosts/{uid}/`

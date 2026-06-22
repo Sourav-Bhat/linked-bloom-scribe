@@ -33,7 +33,8 @@
 ### 1.3 AI
 | Component | Detail |
 |-----------|--------|
-| Model | Gemini, called server-side from Cloud Functions via `functions/src/utils/geminiClient.ts` |
+| Model | Gemini via Vertex AI, called server-side from Cloud Functions via `functions/src/utils/geminiClient.ts` — no API key; auth is the functions' own service account (`firebase-adminsdk-fbsvc@...`, needs the `Vertex AI User` role) |
+| Model selection | Callers may pass an optional `model` field (validated against `SUPPORTED_MODELS` in `geminiClient.ts`); defaults to `gemini-2.5-flash` if omitted or invalid |
 | Cloud Functions using it | `generateContent`, `personaAgent`, `prAgentChat` |
 | Auth to functions | Firebase ID token in `Authorization: Bearer` header, verified by `functions/src/middleware/verifyToken.ts` |
 
@@ -156,7 +157,7 @@ Four tabs, each a separate component, all scoped to `user.uid`:
 | Edit Profile | `ProfileForm` | reads/writes `users/{uid}` document fields — note: `ProfilePage` currently passes it an empty `profile={{}}` and no-op `setProfile`, so the form re-fetches/manages its own state rather than relying on the parent |
 | API Settings | `ApiKeySettings` | **`localStorage` only** — the LLM provider + API key never reach Firestore or any Cloud Function; this is a local dev convenience, not the encrypted-key feature described in PRD Feature 1.1/US-010 |
 
-`PrAgentChat.tsx` posts to `prAgentChat` and currently expects a single JSON response, not the SSE token-by-token stream described in TRD §7.3 — streaming is part of the Cloud Function's design intent but the frontend doesn't consume it as a stream yet.
+`PrAgentChat.tsx` posts to `prAgentChat` and correctly parses the SSE token-by-token stream (OpenAI delta-chunk shape: `data: {"choices":[{"delta":{"content":"..."}}]}`, terminated by `data: [DONE]`) — matches TRD §7.3's design intent.
 
 ### 4.9 LinkedIn (`src/features/linkedin/`)
 - `LinkedInConnect.tsx`, `LinkedInAnalytics.tsx`, `linkedinService.ts` exist but are **not routed anywhere** in `App.tsx` and are not reachable from the UI.
@@ -204,7 +205,6 @@ For context against `PRD.md`/`BACKLOG.md`, the following are **not yet real** in
 - Calendar and Review pages run entirely on hardcoded mock arrays, not Firestore.
 - LinkedIn OAuth/publish/analytics is unimplemented; `linkedinService.ts` is a local mock and isn't routed into the UI.
 - API key management is `localStorage`-only, not persisted or encrypted server-side.
-- `prAgentChat` is called as a single request/response, not consumed as a stream on the frontend.
 - No Chrome extension code exists in this repo yet (Epic 5 in PRD).
 - `postAnalytics`, `engagements`, `inspirations`, `extensionEvents`, `linkedinAccount` Firestore subcollections from `TRD.md` §4.1 are not yet written to by any code path.
 

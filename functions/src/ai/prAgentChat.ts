@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
-import { LOVABLE_API_KEY, callLovableGateway } from '../utils/geminiClient';
+import { streamChat } from '../utils/geminiClient';
 
 const handler = async (req: Request, res: Response): Promise<void> => {
   if (req.method !== 'POST') { res.status(405).end(); return; }
@@ -13,7 +13,10 @@ const handler = async (req: Request, res: Response): Promise<void> => {
   if (res.headersSent) return;
 
   const uid: string = (req as any).uid;
-  const { messages } = req.body as { messages: Array<{ role: string; content: string }> };
+  const { messages, model } = req.body as {
+    messages: Array<{ role: string; content: string }>;
+    model?: string;
+  };
 
   // Load persona context
   let personaContext = '';
@@ -33,30 +36,26 @@ ${personaContext}
 Help them build their LinkedIn presence. Be specific, actionable, and strategic.
 Reference their persona when relevant.`;
 
-  const apiKey = LOVABLE_API_KEY.value();
-  const gatewayRes = await callLovableGateway(apiKey, messages, systemPrompt, true);
-
-  if (!gatewayRes.ok) {
-    const err = await gatewayRes.text();
-    res.status(502).json({ error: `AI gateway error: ${err}` });
+  let stream: AsyncIterable<{ text?: string }>;
+  try {
+    stream = await streamChat(systemPrompt, messages, model);
+  } catch (err: any) {
+    res.status(502).json({ error: `Gemini error: ${err.message || err}` });
     return;
   }
 
-  // Stream SSE response
+  // Stream SSE response in the OpenAI delta-chunk shape the frontend already parses
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  const reader = (gatewayRes.body as any).getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    res.write(chunk);
+  for await (const chunk of stream) {
+    const content = chunk.text;
+    if (content) {
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`);
+    }
   }
 
   res.write('data: [DONE]\n\n');
@@ -64,6 +63,6 @@ Reference their persona when relevant.`;
 };
 
 export const prAgentChat = onRequest(
-  { secrets: [LOVABLE_API_KEY], cors: true, timeoutSeconds: 300 },
+  { cors: true, timeoutSeconds: 300, serviceAccount: 'firebase-adminsdk-fbsvc@contentmanager-ed707.iam.gserviceaccount.com' },
   handler as any,
 );

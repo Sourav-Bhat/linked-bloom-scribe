@@ -1,7 +1,8 @@
 # Technical Requirements Document (TRD)
 ## LinkedBloom Scribe — Firebase Architecture
-**Version:** 2.0 | **Date:** May 2026 | **Owner:** Sourav Bhat | **Status:** Approved
+**Version:** 2.1 | **Date:** June 2026 | **Owner:** Sourav Bhat | **Status:** Approved
 **Change from v1.0:** Migrated from Supabase to Firebase + Firestore + Cloud Functions based on full codebase audit by Claude Code.
+**Change from v2.0:** Replaced the Lovable AI Gateway with direct Vertex AI Gemini calls (no API key — auth via the Cloud Functions service account) and made the model selectable per-request from an allowlist.
 
 ---
 
@@ -39,9 +40,9 @@
 ┌───────────────────────────────▼─────────────────────────────────┐
 │                    EXTERNAL SERVICES                             │
 │  ┌────────────────┐  ┌──────────────────┐  ┌─────────────────┐  │
-│  │  Gemini API    │  │  LinkedIn API v2  │  │  Resend (email) │  │
-│  │  via Lovable   │  │  OAuth + posts +  │  │  Sprint 6       │  │
-│  │  AI Gateway    │  │  analytics        │  │                 │  │
+│  │  Vertex AI     │  │  LinkedIn API v2  │  │  Resend (email) │  │
+│  │  Gemini        │  │  OAuth + posts +  │  │  Sprint 6       │  │
+│  │  (same project)│  │  analytics        │  │                 │  │
 │  └────────────────┘  └──────────────────┘  └─────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -75,15 +76,14 @@
 | File Storage | Firebase Storage | Replace Supabase Storage |
 | Backend Logic | Cloud Functions 2nd gen, Node.js 20 | Replace Supabase Edge Functions (Deno) |
 | Scheduled Tasks | Cloud Scheduler | Replace Supabase pg_cron |
-| Hosting | Firebase Hosting | Replace Lovable hosting (optional) |
+| Hosting | Firebase Hosting | Replaces Lovable-hosted preview — deployed via GitHub Actions CI/CD |
 | Streaming (SSE) | Cloud Run (via Cloud Functions 2nd gen) | Required for prAgentChat |
 
 ### 2.3 External Services
 
 | Service | Purpose | Notes |
 |---------|---------|-------|
-| Gemini 2.5 Pro | Persona generation, content creation, chat | Via `ai.gateway.lovable.dev` + `LOVABLE_API_KEY` — preserve existing |
-| Gemini Flash | PR agent chat (faster, cheaper) | Same gateway |
+| Gemini (Vertex AI) | Persona generation, content creation, chat | Called directly via `@google/genai` against Vertex AI in the same GCP project — no API key, auth via the Cloud Functions service account. Model is selectable per-request from an allowlist in `geminiClient.ts` (defaults to `gemini-2.5-flash`) |
 | LinkedIn API v2 | OAuth, publish posts, fetch analytics | Custom PKCE flow via Cloud Function |
 | Resend | Transactional email (Sprint 6) | New |
 
@@ -133,11 +133,13 @@ VITE_FIREBASE_APP_ID=
 
 **Cloud Function secrets — set via CLI, never in .env:**
 ```bash
-firebase functions:secrets:set LOVABLE_API_KEY      # existing — preserve
 firebase functions:secrets:set LINKEDIN_CLIENT_ID
 firebase functions:secrets:set LINKEDIN_CLIENT_SECRET
 firebase functions:secrets:set RESEND_API_KEY       # Sprint 6
 ```
+Note: Gemini calls need no secret — `generateContent`, `personaAgent`, and `prAgentChat` run as
+`firebase-adminsdk-fbsvc@contentmanager-ed707.iam.gserviceaccount.com` and call Vertex AI directly,
+authenticating via that service account's IAM role (`Vertex AI User`), not an API key.
 
 ### 3.3 Activated `src/lib/firebase.ts`
 ```typescript
@@ -482,7 +484,7 @@ functions/
       fetchScheduledAnalytics.ts     new: analytics fetch cron
     utils/
       encryptDecrypt.ts              AES-256 for LinkedIn tokens
-      geminiClient.ts                shared Gemini/Lovable gateway client
+      geminiClient.ts                shared Vertex AI Gemini client — model-selectable, no API key
       corsConfig.ts                  shared CORS setup
 ```
 
@@ -522,12 +524,13 @@ const res = await fetch(CLOUD_FUNCTION_URL, {
 ```
 Method: HTTPS POST | Runtime: Node.js 20 | Memory: 256MB | Timeout: 60s
 Auth: Firebase ID token
-Input:  { topic, tone, postLength, instructions, hashtagsEnabled, previousDraft?, feedback? }
+Input:  { topic, tone, postLength, instructions, hashtagsEnabled, previousDraft?, feedback?, model? }
 Steps:
   1. verifyToken(req) → uid
   2. db.doc(`users/${uid}/persona/main`).get() → persona context
   3. db.collection(`users/${uid}/inspirations`).limit(10).get() → inspiration context
-  4. POST to ai.gateway.lovable.dev with persona + inspirations + inputs (LOVABLE_API_KEY secret)
+  4. Call Vertex AI Gemini (geminiClient.generateText) with persona + inspirations + inputs;
+     `model` selects from the SUPPORTED_MODELS allowlist, defaults to gemini-2.5-flash
   5. Return { title, content, hashtags }
   Note: version appending done client-side via Firestore updateDoc
 ```
@@ -536,7 +539,7 @@ Steps:
 ```
 Method: HTTPS POST | Runtime: Node.js 20 | Memory: 256MB | Timeout: 120s
 Auth: Firebase ID token
-Input:  { onboardingData: OnboardingPayload }
+Input:  { onboardingData: OnboardingPayload, model? }
 Steps:
   1. verifyToken(req) → uid
   2. POST to Gemini with onboarding data
@@ -549,7 +552,7 @@ Steps:
 ```
 Method: HTTPS POST | Runtime: Node.js 20 (2nd gen) | Memory: 512MB | Timeout: 300s
 Auth: Firebase ID token
-Input:  { message: string, conversationHistory: ChatMessage[] }
+Input:  { messages: ChatMessage[], model? }
 Steps:
   1. verifyToken(req) → uid
   2. db.doc(`users/${uid}/persona/main`).get() → persona context
@@ -786,7 +789,7 @@ Step 4.1  mkdir functions && firebase init functions (Node.js 20, TypeScript)
 Step 4.2  Port generate-content → functions/src/ai/generateContent.ts
 Step 4.3  Port persona-agent → functions/src/ai/personaAgent.ts
 Step 4.4  Port pr-agent-chat → functions/src/ai/prAgentChat.ts (2nd gen, streaming — see spec Section 7.3)
-Step 4.5  firebase functions:secrets:set LOVABLE_API_KEY (use existing key value)
+Step 4.5  Enable the Vertex AI API; grant firebase-adminsdk-fbsvc@... the "Vertex AI User" role (no secret needed)
 Step 4.6  firebase deploy --only functions
 Step 4.7  Update Cloud Function URLs in frontend (replace Supabase Edge Function URLs)
 Step 4.8  TEST: onboarding → persona generation works, content generation works, PR agent chat streams

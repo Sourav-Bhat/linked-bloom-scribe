@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
-import { LOVABLE_API_KEY, callLovableGateway } from '../utils/geminiClient';
+import { generateText } from '../utils/geminiClient';
 
 const handler = async (req: Request, res: Response): Promise<void> => {
   if (req.method !== 'POST') { res.status(405).end(); return; }
@@ -13,7 +13,7 @@ const handler = async (req: Request, res: Response): Promise<void> => {
   if (res.headersSent) return;
 
   const uid: string = (req as any).uid;
-  const { topic, tone, instructions, includeHashtags, postLength, regeneratePrompt, previousContent } = req.body;
+  const { topic, tone, instructions, includeHashtags, postLength, regeneratePrompt, previousContent, model } = req.body;
 
   // Load persona context
   let personaContext = '';
@@ -38,17 +38,13 @@ const handler = async (req: Request, res: Response): Promise<void> => {
     'Return valid JSON: { "title": "...", "content": "...", "hashtags": "..." }',
   ].filter(Boolean).join(' ');
 
-  const apiKey = LOVABLE_API_KEY.value();
-  const gatewayRes = await callLovableGateway(apiKey, [{ role: 'user', content: 'Generate content as instructed.' }], systemPrompt);
-
-  if (!gatewayRes.ok) {
-    const err = await gatewayRes.text();
-    res.status(502).json({ error: `AI gateway error: ${err}` });
+  let text: string;
+  try {
+    text = await generateText(systemPrompt, 'Generate content as instructed.', model);
+  } catch (err: any) {
+    res.status(502).json({ error: `Gemini error: ${err.message || err}` });
     return;
   }
-
-  const data = await gatewayRes.json() as any;
-  const text: string = data.choices?.[0]?.message?.content || '';
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -60,6 +56,6 @@ const handler = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const generateContent = onRequest(
-  { secrets: [LOVABLE_API_KEY], cors: true },
+  { cors: true, serviceAccount: 'firebase-adminsdk-fbsvc@contentmanager-ed707.iam.gserviceaccount.com' },
   handler as any,
 );
