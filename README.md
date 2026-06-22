@@ -13,32 +13,33 @@ Full product/technical documentation lives in [project_plan/](project_plan/) (BR
 
 ## Local Development
 
-Requires Node.js 20+.
+Requires Node.js 20+, Java (for the Firebase emulators), and the Firebase CLI.
+
+Local dev runs **entirely against the Firebase Emulator Suite** — Auth, Firestore,
+Storage, and Functions all run on your machine. No cloud project is touched and no
+separate Firebase project is needed. (The one exception: Gemini can't be emulated,
+so the local functions call real Vertex AI — app data still stays 100% local.)
 
 ```sh
 npm install
-cp .env.development.example .env.development   # fill in your DEV Firebase project config
+cp .env.development.example .env.development          # emulator defaults; usually no edits needed
+cp functions/.env.local.example functions/.env.local  # set VERTEX_PROJECT + a service-account key path
+
+# terminal 1 — start the emulators (Auth/Firestore/Storage/Functions + UI on :4000)
+npm run emulators
+
+# terminal 2 — start the app (connects to the emulators automatically)
 npm run dev
 ```
 
-`npm run dev` runs in **development mode** and reads `.env.development`, so local work always talks to the **dev** Firebase project — never production. See [Environments](#environments) below for the full dev/prod separation model.
-
-### Cloud Functions
-
-Functions live in [functions/](functions/) and are deployed separately:
-
-```sh
-cd functions
-npm install
-npm run build
-npm run deploy        # firebase deploy --only functions
-# or, for local testing:
-npm run serve          # firebase emulators:start --only functions
-```
+`npm run dev` runs in development mode (`.env.development`, `VITE_USE_EMULATORS=true`),
+so the SDK points at the local emulators and the app shows a **DEV** badge. See
+[Environments](#environments) and [project_plan/ENVIRONMENTS.md](project_plan/ENVIRONMENTS.md).
 
 ### Other scripts
 
 ```sh
+npm run emulators   # build functions + start the full emulator suite
 npm run build       # production build
 npm run build:dev   # development-mode build
 npm run lint         # eslint
@@ -47,36 +48,31 @@ npm run preview      # preview a production build locally
 
 ## Running with Docker
 
-A Dockerfile builds the Vite app and serves it via nginx. The image builds in
-**development mode** by default (dev Firebase project), since Docker here is a
-local test environment. The host port is configurable via `APP_PORT` (default 3000):
+Docker builds and serves the static artifact via nginx — handy for testing the
+built bundle, but it is **not** the emulator dev path (a container can't reach the
+host emulators without extra networking). For day-to-day dev use `npm run dev` +
+`npm run emulators`. The Docker host port is configurable via `APP_PORT` (default 3000):
 
 ```sh
 APP_PORT=3100 docker compose up --build      # http://localhost:3100
 ```
 
-For a production-config image: `docker build --build-arg BUILD_MODE=production .`
-(requires a local `.env.production`, which normally only exists in CI).
-
 ## Environments
 
-The app has complete dev/prod separation — two Firebase projects, selected by Vite mode:
+Complete dev/prod separation — local emulators for dev, the real Firebase project for prod:
 
-| | Local dev / Docker | Production |
+| | Local dev | Production |
 |--|--|--|
-| Trigger | `npm run dev`, `docker compose up`, or push to `dev` branch | push to `main` branch |
-| Vite mode | `development` | `production` |
-| Env file | `.env.development` (local) / dev GitHub secrets (CI) | `.env.production` (CI secrets only) |
-| Firebase project | your dev project | `contentmanager-ed707` |
-| CI workflow | `.github/workflows/deploy-dev.yml` | `.github/workflows/deploy.yml` |
+| Backend | Firebase Emulator Suite (Auth/Firestore/Storage/Functions, all local) | `contentmanager-ed707` |
+| Trigger | `npm run dev` + `npm run emulators` | push to `main` branch |
+| Vite mode | `development` (`VITE_USE_EMULATORS=true`) | `production` |
+| Env file | `.env.development` (local) | `.env.production` (CI secrets) |
+| AI (Gemini) | real Vertex AI via local service-account key | real Vertex AI via runtime SA |
+| CI workflow | `.github/workflows/ci.yml` (build check only) | `.github/workflows/deploy.yml` (deploy) |
 | DEV badge | shown | hidden |
 
-Config files are gitignored; copy the `*.example` templates. `.firebaserc` defines
-`dev` and `prod` aliases (`firebase use dev` / `firebase use prod`).
-
-**Setting up the dev project** — see [project_plan/ENVIRONMENTS.md](project_plan/ENVIRONMENTS.md)
-for the one-time checklist (create project, enable APIs, init Storage, grant the
-runtime service account `Vertex AI User`, and add the `*_DEV` GitHub secrets).
+The `dev` branch pushes run a CI build check (no deploy); merging to `main` deploys prod.
+Config files are gitignored; copy the `*.example` templates.
 
 ## Project Structure
 

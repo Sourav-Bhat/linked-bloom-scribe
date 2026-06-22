@@ -1,84 +1,73 @@
 # Environments — Dev / Prod Separation
 
-LinkedBloom Scribe runs against **two completely separate Firebase projects**. Nothing
-is shared between them — Auth users, Firestore data, Storage files, and Cloud Functions
-all live in whichever project the current build is wired to.
+LinkedBloom Scribe keeps development and production completely separate **without a
+second Firebase project**. Local development runs entirely on the **Firebase Emulator
+Suite** (Auth, Firestore, Storage, and Functions all on your machine); production is
+the real `contentmanager-ed707` project. Dev data is local and ephemeral and never
+touches the cloud.
 
-| | Dev | Prod |
+| | Dev (local) | Prod |
 |--|--|--|
-| Firebase project | _your dev project_ (e.g. `contentmanager-dev`) | `contentmanager-ed707` |
-| Selected by | Vite `development` mode | Vite `production` mode |
-| Frontend config | `.env.development` (local) or `*_DEV` GitHub secrets (CI) | `.env.production` (CI secrets only) |
-| Runs when | `npm run dev`, local Docker, or push to **`dev`** branch | push to **`main`** branch |
-| Deploy workflow | `.github/workflows/deploy-dev.yml` | `.github/workflows/deploy.yml` |
+| Backend | Firebase Emulator Suite — all local | `contentmanager-ed707` |
+| Selected by | Vite `development` mode + `VITE_USE_EMULATORS=true` | Vite `production` mode |
+| Frontend config | `.env.development` (gitignored; emulator defaults) | `.env.production` (CI secrets) |
+| Runs when | `npm run dev` + `npm run emulators` | push to **`main`** branch |
+| CI workflow | `.github/workflows/ci.yml` — build check, no deploy | `.github/workflows/deploy.yml` — full deploy |
 | In-app DEV badge | visible (amber, bottom-right) | hidden |
 
-How the switch works: Vite loads `.env.<mode>` per build mode. `VITE_APP_ENV` drives the
-DEV badge (`src/components/DevModeBadge.tsx`); the `VITE_FIREBASE_*` values point the
-client SDK at the right project; Cloud Functions are project-portable (no hardcoded
-project/service-account) and call Vertex AI in whatever project they're deployed to.
+### The one thing that can't be emulated: Gemini
+
+Vertex AI is a real cloud API, so when the local Functions emulator runs the AI
+functions they call **real Gemini**. Only stateless inference leaves your machine —
+all app data (users, posts, persona docs, uploads) stays in the local emulators.
+`functions/.env.local` provides the credentials for those calls:
+
+- `VERTEX_PROJECT` — a real GCP project to bill inference to (reuse the existing one).
+- `GOOGLE_APPLICATION_CREDENTIALS` — absolute path to a service-account key with the
+  `Vertex AI User` role on that project.
+
+In a deployed (prod) function `VERTEX_PROJECT` is unset and the ambient project is
+the live one, so prod behavior is unchanged.
 
 ---
 
-## One-time setup for the DEV project
+## Local dev setup (one-time)
 
-### 1. Create the Firebase project
-- Firebase console → Add project (e.g. `contentmanager-dev`). Enable **Blaze** billing
-  (required for 2nd-gen Cloud Functions).
-- Add a **Web app** → copy its config into `.env.development` (locally) using
-  `.env.development.example` as the template.
+1. **Install prerequisites**
+   - Node.js 20+, the Firebase CLI (`npm i -g firebase-tools`), and **Java** (the
+     Firestore/Auth emulators need a JRE — `java -version` to check; `brew install temurin` if missing).
+2. **Create the env files** (both gitignored; templates are committed)
+   ```sh
+   cp .env.development.example .env.development            # emulator defaults — usually no edits
+   cp functions/.env.local.example functions/.env.local   # set VERTEX_PROJECT + key path
+   ```
+3. **Run it** (two terminals)
+   ```sh
+   npm run emulators   # builds functions, starts Auth/Firestore/Storage/Functions + UI on :4000
+   npm run dev         # app on :8080, auto-connected to the emulators
+   ```
+4. Open the app — you'll see the **DEV** badge. Sign up / log in: the user is created
+   in the **Auth emulator**, data lands in the **Firestore/Storage emulators**, and the
+   emulator UI at http://localhost:4000 lets you inspect everything.
 
-### 2. Enable services / APIs
-In the dev project, enable (console or `gcloud`):
-- **Authentication** → enable Email/Password + Google providers
-- **Firestore** → create database
-- **Storage** → click **Get Started** to provision the bucket
-- APIs: `aiplatform` (Vertex AI), `cloudfunctions`, `cloudbuild`, `artifactregistry`,
-  `run`, `eventarc`, `pubsub`, `secretmanager`, `cloudscheduler`, `serviceusage`,
-  `firebasestorage`, `cloudbilling`
-  _(the deploy will auto-enable most of these the first time, given the roles below)_
-
-### 3. Service account for CI deploys
-- Project settings → Service accounts → **Generate new private key** (Admin SDK).
-- Grant that service account these roles (IAM page):
-  `Firebase Admin`, `Service Usage Admin`, `Service Account User`,
-  `Artifact Registry Administrator`, `Cloud Functions Admin`.
-- Grant the dev project's **default Functions runtime service account** the
-  `Vertex AI User` role (`roles/aiplatform.user`) so deployed functions can call Gemini.
-  (Prod pins functions to its `firebase-adminsdk` account instead — see `deploy.yml`.)
-
-### 4. GitHub secrets for the dev workflow
-`deploy-dev.yml` (push to `dev`) reads these — add them under
-**repo → Settings → Secrets and variables → Actions**:
-
-| Secret | Value |
-|--|--|
-| `FIREBASE_SERVICE_ACCOUNT_DEV` | full JSON of the dev Admin SDK key from step 3 |
-| `VITE_FIREBASE_API_KEY_DEV` | dev web config |
-| `VITE_FIREBASE_AUTH_DOMAIN_DEV` | dev web config |
-| `VITE_FIREBASE_PROJECT_ID_DEV` | dev project id (also used as the deploy target) |
-| `VITE_FIREBASE_STORAGE_BUCKET_DEV` | dev web config |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID_DEV` | dev web config |
-| `VITE_FIREBASE_APP_ID_DEV` | dev web config |
-| `VITE_CLOUD_FUNCTIONS_BASE_URL_DEV` | `https://us-central1-<dev-project>.cloudfunctions.net` |
-
-### 5. Point `.firebaserc` at the dev project
-Replace `REPLACE_WITH_DEV_PROJECT_ID` in `.firebaserc` with the dev project id, enabling
-`firebase use dev` / `firebase use prod` for manual CLI work.
+Emulator ports (see `firebase.json`): Auth `9099`, Functions `5001`, Firestore `8088`
+(8080 is Vite), Storage `9199`, UI `4000`.
 
 ---
 
 ## Daily workflow
-- **Local dev:** `npm run dev` (or `APP_PORT=3100 docker compose up --build`) → dev project.
-- **Ship to dev backend:** push to `dev` → `deploy-dev.yml` deploys hosting + functions +
-  rules to the dev project.
-- **Ship to prod:** merge `dev` → `main` → `deploy.yml` deploys to `contentmanager-ed707`.
+- **Develop locally** on the `dev` branch against the emulators.
+- **Push `dev`** → `ci.yml` build-checks the web app + functions (no deploy).
+- **Merge `dev` → `main`** → `deploy.yml` deploys hosting + functions + rules to prod.
 
 ## Notes / gotchas
-- Local config files are **gitignored**; only the `*.example` templates are committed.
+- Local config files (`.env*`, `functions/.env.local`) are **gitignored**; only the
+  `*.example` templates are committed.
 - A build with no env file shows the DEV badge by default (fail-safe — never silently "prod").
 - `firebase-tools` is pinned to run under Node 20 in CI (newer Node majors break its
   bundled networking deps).
-- Prod functions keep running as the `firebase-adminsdk-fbsvc@contentmanager-ed707…`
-  service account (set via `FUNCTIONS_SERVICE_ACCOUNT` in `deploy.yml`), so the prod
-  runtime identity is unchanged by the portability refactor.
+- Prod functions run as `firebase-adminsdk-fbsvc@contentmanager-ed707…` (pinned via
+  `FUNCTIONS_SERVICE_ACCOUNT` in `deploy.yml`); locally the same code runs in the
+  emulator with credentials from `functions/.env.local`.
+- Emulator data is in-memory by default (cleared on stop). To persist across runs:
+  `firebase emulators:start --import=./.emulator-data --export-on-exit`.

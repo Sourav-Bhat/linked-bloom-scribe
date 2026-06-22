@@ -1,0 +1,38 @@
+name: CI (build check)
+
+# Dev runs locally against the Firebase Emulator Suite — there is no dev cloud
+# project to deploy to. This job just verifies the web app and Cloud Functions
+# both build, on pushes to dev and on PRs into main, so breakage is caught
+# before it reaches the production deploy on main.
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install web app dependencies
+        run: npm ci
+
+      - name: Build web app (development mode)
+        run: npm run build -- --mode development
+
+      - name: Install Cloud Functions dependencies
+        run: npm ci --prefix functions
+
+      - name: Build Cloud Functions
+        run: npm --prefix functions run build

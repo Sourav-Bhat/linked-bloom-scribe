@@ -1,6 +1,14 @@
 import { GoogleGenAI } from '@google/genai';
 
-const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+// Vertex AI is a real cloud API (can't be emulated). When running under the
+// local Functions emulator the ambient project is the demo/emulator project,
+// so VERTEX_PROJECT lets us point Gemini calls at a real GCP project. In a
+// deployed function VERTEX_PROJECT is unset and GCLOUD_PROJECT is the live
+// project, so prod behavior is unchanged.
+const PROJECT_ID =
+  process.env.VERTEX_PROJECT ||
+  process.env.GCLOUD_PROJECT ||
+  process.env.GOOGLE_CLOUD_PROJECT;
 const LOCATION = 'us-central1';
 
 // Allowlist of Gemini models callers may request. Keep this in sync with

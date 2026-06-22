@@ -5,6 +5,14 @@
 .env.development
 .env.production
 .env.*.local
+# Cloud Functions local env (Vertex creds for the emulator)
+functions/.env
+functions/.env.local
+
+# Firebase emulator data / logs
+.firebase/
+*-debug.log
+firebase-export-*
 
 # Logs
 logs

@@ -29,7 +29,7 @@
 | File Storage | Firebase Storage | SDK initialized in `src/lib/firebase.ts`; only consumer today is the onboarding admired-posts image upload (`StepTwo.tsx`) |
 | Serverless compute | Cloud Functions (2nd gen, Node.js 20) | only used for the three AI endpoints — see §6 |
 | Hosting/deploy | Docker (nginx) locally; Firebase Hosting via GitHub Actions CI | |
-| Environments | Two Firebase projects (dev/prod), selected by Vite mode — `npm run dev`/Docker/`dev` branch → dev project; `main` branch → prod. See [ENVIRONMENTS.md](ENVIRONMENTS.md). A DEV badge shows in every non-prod build. | |
+| Environments | Dev = local Firebase Emulator Suite (Auth/Firestore/Storage/Functions); prod = `contentmanager-ed707` on `main`. Selected by Vite mode + `VITE_USE_EMULATORS`. Gemini is the only real cloud call in dev. See [ENVIRONMENTS.md](ENVIRONMENTS.md). DEV badge shows in non-prod builds. | |
 
 ### 1.3 AI
 | Component | Detail |

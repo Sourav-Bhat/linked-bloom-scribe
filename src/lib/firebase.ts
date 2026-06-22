@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -29,5 +29,18 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// In dev, point the SDK at the local Firebase Emulator Suite so Auth, Firestore,
+// and Storage are fully local — no cloud project touched. Enabled by
+// VITE_USE_EMULATORS in .env.development. The globalThis guard prevents
+// double-connecting across Vite HMR reloads.
+export const USE_EMULATORS = import.meta.env.VITE_USE_EMULATORS === 'true';
+if (USE_EMULATORS && !(globalThis as any).__lbEmulatorsConnected) {
+  (globalThis as any).__lbEmulatorsConnected = true;
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, 'localhost', 8088);
+  connectStorageEmulator(storage, 'localhost', 9199);
+  console.info('[LinkedBloom] connected to local Firebase emulators');
+}
 
 export default app;
