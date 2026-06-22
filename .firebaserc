@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "contentmanager-ed707"
+    "default": "contentmanager-ed707",
+    "prod": "contentmanager-ed707",
+    "dev": "REPLACE_WITH_DEV_PROJECT_ID"
   }
 }

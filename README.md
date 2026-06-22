@@ -17,11 +17,11 @@ Requires Node.js 20+.
 
 ```sh
 npm install
-cp .env.example .env   # fill in your Firebase project config
+cp .env.development.example .env.development   # fill in your DEV Firebase project config
 npm run dev
 ```
 
-The app expects a Firebase project with Auth, Firestore, and Storage enabled. See `.env.example` for the required `VITE_FIREBASE_*` variables and the Cloud Functions base URL.
+`npm run dev` runs in **development mode** and reads `.env.development`, so local work always talks to the **dev** Firebase project — never production. See [Environments](#environments) below for the full dev/prod separation model.
 
 ### Cloud Functions
 
@@ -47,13 +47,36 @@ npm run preview      # preview a production build locally
 
 ## Running with Docker
 
-A Dockerfile builds the Vite app and serves it via nginx on port 3000:
+A Dockerfile builds the Vite app and serves it via nginx. The image builds in
+**development mode** by default (dev Firebase project), since Docker here is a
+local test environment. The host port is configurable via `APP_PORT` (default 3000):
 
 ```sh
-docker compose up --build
+APP_PORT=3100 docker compose up --build      # http://localhost:3100
 ```
 
-Then open http://localhost:3000.
+For a production-config image: `docker build --build-arg BUILD_MODE=production .`
+(requires a local `.env.production`, which normally only exists in CI).
+
+## Environments
+
+The app has complete dev/prod separation — two Firebase projects, selected by Vite mode:
+
+| | Local dev / Docker | Production |
+|--|--|--|
+| Trigger | `npm run dev`, `docker compose up`, or push to `dev` branch | push to `main` branch |
+| Vite mode | `development` | `production` |
+| Env file | `.env.development` (local) / dev GitHub secrets (CI) | `.env.production` (CI secrets only) |
+| Firebase project | your dev project | `contentmanager-ed707` |
+| CI workflow | `.github/workflows/deploy-dev.yml` | `.github/workflows/deploy.yml` |
+| DEV badge | shown | hidden |
+
+Config files are gitignored; copy the `*.example` templates. `.firebaserc` defines
+`dev` and `prod` aliases (`firebase use dev` / `firebase use prod`).
+
+**Setting up the dev project** — see [project_plan/ENVIRONMENTS.md](project_plan/ENVIRONMENTS.md)
+for the one-time checklist (create project, enable APIs, init Storage, grant the
+runtime service account `Vertex AI User`, and add the `*_DEV` GitHub secrets).
 
 ## Project Structure
 

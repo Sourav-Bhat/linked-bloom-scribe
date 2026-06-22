@@ -3,6 +3,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
 import { streamChat } from '../utils/geminiClient';
+import { baseHttpsOptions } from '../utils/httpsOptions';
 
 const handler = async (req: Request, res: Response): Promise<void> => {
   if (req.method !== 'POST') { res.status(405).end(); return; }
@@ -63,6 +64,6 @@ Reference their persona when relevant.`;
 };
 
 export const prAgentChat = onRequest(
-  { cors: true, timeoutSeconds: 300, serviceAccount: 'firebase-adminsdk-fbsvc@contentmanager-ed707.iam.gserviceaccount.com' },
+  { ...baseHttpsOptions, timeoutSeconds: 300 },
   handler as any,
 );

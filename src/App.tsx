@@ -17,6 +17,7 @@ import Login from "@/features/auth/LoginPage";
 import Onboarding from "@/features/onboarding/OnboardingPage";
 import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
+import DevModeBadge from "./components/DevModeBadge";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,6 +77,7 @@ const App = () => {
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            <DevModeBadge />
             <BrowserRouter>
               <Routes>
                 <Route

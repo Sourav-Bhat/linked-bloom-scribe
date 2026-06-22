@@ -1,6 +1,9 @@
-# Environment variables — copy .env.example to .env and fill in values
+# Environment variables — copy the *.example templates and fill in values.
+# Per-environment config is local-only / CI-generated; never commit real values.
 .env
 .env.local
+.env.development
+.env.production
 .env.*.local
 
 # Logs

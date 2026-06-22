@@ -11,6 +11,7 @@
 | `PRD.md` | Product Requirements — full feature specs with acceptance criteria per feature | Product Owner + Claude Code |
 | `TRD.md` | Technical Requirements — target architecture, Firestore data model, Cloud Function specs, security | Claude Code |
 | `APPLICATION_ARCHITECTURE.md` | As-built reference — actual routes, component workflow, tech stack, and gaps vs. plan | Claude Code |
+| `ENVIRONMENTS.md` | Dev/prod separation model + one-time dev Firebase project setup checklist | Sourav Bhat + Claude Code |
 | `BACKLOG.md` | Full backlog — all 54 user stories with acceptance criteria and dependencies | Claude Code |
 | `SPRINTS.md` | Sprint execution guide — ordered story list per sprint with DoD | Claude Code |
 | `LinkedBloom_Project_Backlog.xlsx` | Excel version of backlog — 4 sheets: Full Backlog, Sprint Plan, Dependency Map, Legend | Product Owner review |

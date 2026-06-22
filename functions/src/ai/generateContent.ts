@@ -3,6 +3,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
 import { verifyToken } from '../middleware/verifyToken';
 import { generateText } from '../utils/geminiClient';
+import { baseHttpsOptions } from '../utils/httpsOptions';
 
 const handler = async (req: Request, res: Response): Promise<void> => {
   if (req.method !== 'POST') { res.status(405).end(); return; }
@@ -55,7 +56,4 @@ const handler = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const generateContent = onRequest(
-  { cors: true, serviceAccount: 'firebase-adminsdk-fbsvc@contentmanager-ed707.iam.gserviceaccount.com' },
-  handler as any,
-);
+export const generateContent = onRequest(baseHttpsOptions, handler as any);
