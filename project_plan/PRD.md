@@ -1,6 +1,7 @@
 # Product Requirements Document (PRD)
 ## LinkedBloom Scribe — Agentic Personal Branding Platform
-**Version:** 1.0 | **Date:** May 2026 | **Owner:** Sourav Bhat | **Status:** Approved
+**Version:** 1.1 | **Date:** May 2026 | **Owner:** Sourav Bhat | **Status:** Approved
+**Change from v1.0:** Backend references updated from Supabase/Postgres to Firebase/Firestore to match TRD v2.0.
 
 ---
 
@@ -58,19 +59,19 @@ Settings page, notifications, content templates, post import, mobile layout.
 
 ### EPIC 1: Platform Foundation Fixes
 
-#### Feature 1.1 — Posts Table DB Migration
-**Problem:** hashtags, topic, tone, instructions, post_length, versions fields exist in app code but not in DB. contentService silently strips them.
-**Requirement:** DB schema must match application data model exactly.
+#### Feature 1.1 — Posts Data Model Completeness
+**Problem:** hashtags, topic, tone, instructions, postLength, versions fields exist in app code but contentService doesn't write/read them to/from Firestore.
+**Requirement:** Firestore `posts` subcollection documents and the `Post` TypeScript type cover every field the app actually uses.
 
 **Acceptance Criteria:**
-- posts table includes: hashtags (text[]), topic (text), tone (text), instructions (text), post_length (text), versions (jsonb), scheduled_at (timestamptz), published_at (timestamptz), linkedin_post_id (text), performance_data (jsonb)
+- `users/{uid}/posts/{postId}` documents support: hashtags (string[]), topic (string), tone (string), instructions (string), postLength (string), versions (array), scheduledAt (Timestamp), publishedAt (Timestamp), linkedinPostId (string), performanceData (object)
 - contentService reads and writes all fields without data loss
-- Existing posts data is not corrupted by migration
-- RLS policies updated to cover new columns
+- Existing post documents are unaffected — Firestore is schemaless, so no migration step is needed; new fields simply start being written
+- Firestore security rules confirmed to cover the full `posts` subcollection path
 
 #### Feature 1.2 — Calendar Wired to Real Data
 **Problem:** Calendar uses hardcoded mock data. Schedule/reschedule/delete do not persist.
-**Requirement:** Calendar reads from and writes to Supabase posts table in real time.
+**Requirement:** Calendar reads from and writes to the Firestore `users/{uid}/posts` subcollection in real time.
 
 **Acceptance Criteria:**
 - Calendar displays all posts with status draft/scheduled/published from DB
@@ -89,15 +90,15 @@ Settings page, notifications, content templates, post import, mobile layout.
 - API Keys section: save/update/delete Gemini and OpenAI keys with masked display
 - Notification preferences: toggle email reminders for scheduled posts
 - Danger Zone: "Delete all my data" button with two-step confirmation
-- All settings changes persist to Supabase on save
+- All settings changes persist to the user's Firestore document on save
 
 #### Feature 1.4 — Version History Persistence
 **Problem:** Version history tracked in React state only; lost on page refresh.
 **Requirement:** Every draft version is persisted to DB.
 
 **Acceptance Criteria:**
-- Each generate or regenerate action appends a new version object to versions JSONB array on the post record
-- Version object contains: version_number, content, title, hashtags, generated_at, model_used, instructions_used
+- Each generate or regenerate action appends a new version object to the versions array on the post document
+- Version object contains: versionNumber, content, title, hashtags, generatedAt, modelUsed, instructionsUsed
 - ContentPreview shows version history list with timestamps
 - User can restore any previous version with one click
 - Restoring a version creates a new version entry (non-destructive)
@@ -114,12 +115,12 @@ Settings page, notifications, content templates, post import, mobile layout.
 **Acceptance Criteria:**
 - "Connect LinkedIn" button initiates OAuth 2.0 PKCE flow
 - User is redirected to LinkedIn authorization page with correct scopes: w_member_social, r_liteprofile, r_emailaddress, r_organization_social
-- On successful auth, access token and refresh token stored encrypted in linkedin_accounts table
+- On successful auth, access token and refresh token stored encrypted in the `users/{uid}/linkedinAccount/main` Firestore document
 - Connection status shown in Settings and dashboard header
 - "Disconnect LinkedIn" removes tokens from DB
 - Token refresh handled automatically when access token expires
 - Error states handled: user denies permission, token expired, revoked access
-- New DB table: linkedin_accounts (id, user_id, access_token_encrypted, refresh_token_encrypted, expires_at, linkedin_member_id, connected_at)
+- New Firestore document: `users/{uid}/linkedinAccount/main` (linkedinMemberId, accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt, scopes, connectedAt, lastRefreshedAt, isActive)
 
 #### Feature 2.2 — Post Publishing to LinkedIn
 **Problem:** Posts reach "published" status in DB but are never sent to LinkedIn.
@@ -128,10 +129,10 @@ Settings page, notifications, content templates, post import, mobile layout.
 **Acceptance Criteria:**
 - "Publish to LinkedIn" button visible on posts with status 'final' or 'scheduled'
 - Button disabled with tooltip if LinkedIn not connected
-- Clicking publish calls Edge Function → LinkedIn Share API (UGC Posts endpoint)
-- On success: post status updated to 'published', linkedin_post_id stored, published_at timestamp set
-- On failure: error message shown, status remains unchanged, error logged to post record
-- Scheduled posts auto-publish via cron Edge Function at scheduled_at time
+- Clicking publish calls a Cloud Function → LinkedIn Share API (UGC Posts endpoint)
+- On success: post status updated to 'published', linkedinPostId stored, publishedAt timestamp set
+- On failure: error message shown, status remains unchanged, error logged to post document
+- Scheduled posts auto-publish via a Cloud Scheduler-triggered Cloud Function at scheduledAt time
 - Published posts show LinkedIn icon and "View on LinkedIn" link opening in new tab
 - Hashtags included in LinkedIn post body as per LinkedIn API requirements
 
@@ -140,9 +141,9 @@ Settings page, notifications, content templates, post import, mobile layout.
 **Requirement:** After publishing, import and store LinkedIn post performance data.
 
 **Acceptance Criteria:**
-- New DB table: post_analytics (id, post_id, user_id, impressions, reactions, comments, shares, clicks, engagement_rate, fetched_at)
+- New Firestore subcollection: `users/{uid}/postAnalytics/{id}` (postId, impressions, reactions, comments, shares, clicks, engagementRate, fetchPeriod, fetchedAt)
 - Performance data fetched 24h, 48h, 7d, 14d, 30d after publishing
-- Edge Function fetches metrics from LinkedIn Analytics API and upserts to post_analytics
+- Cloud Function fetches metrics from LinkedIn Analytics API and writes to postAnalytics
 - Manual "Refresh metrics" button on published post view
 - Engagement rate calculated as: (reactions + comments + shares) / impressions × 100
 - Historical performance data retained (multiple fetches per post stored)
@@ -160,7 +161,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 - KPI cards: Total Impressions (30d), Total Reactions (30d), Avg Engagement Rate (30d), Posts Published (30d)
 - Trend indicators on each KPI: up/down vs previous 30d period
 - Top performing post card: highest engagement rate post with preview and metrics
-- All data sourced from post_analytics table, not mock data
+- All data sourced from the postAnalytics subcollection, not mock data
 - Empty state with guidance shown when no published posts exist
 - Data refreshes on page load; manual refresh button available
 
@@ -202,8 +203,8 @@ Settings page, notifications, content templates, post import, mobile layout.
 - Each comment option: max 3 sentences, persona-aware (uses user's voice profile), no generic filler phrases
 - User can edit any option inline before copying
 - "Copy to clipboard" button on each option
-- One-click "Save as draft engagement" stores comment + source post URL to engagements table
-- New DB table: engagements (id, user_id, source_post_url, source_post_text, comment_options jsonb, selected_comment, posted_at, created_at)
+- One-click "Save as draft engagement" stores comment + source post URL to the engagements subcollection
+- New Firestore subcollection: `users/{uid}/engagements/{id}` (sourcePostUrl, sourcePostText, commentOptions, selectedComment, postedAt, createdAt)
 - Character count shown (LinkedIn comment limit: 1,250 characters)
 
 #### Feature 4.2 — Inspiration Library
@@ -217,8 +218,8 @@ Settings page, notifications, content templates, post import, mobile layout.
 - User can tag inspirations by topic (free text + auto-suggest from their content pillars)
 - Delete inspiration with confirmation
 - Search/filter by topic tag or keyword
-- New DB table: inspirations (id, user_id, source_url, source_text, screenshot_url, note, tags text[], saved_at)
-- Supabase storage bucket for screenshots
+- New Firestore subcollection: `users/{uid}/inspirations/{id}` (sourceUrl, sourceText, screenshotUrl, note, tags string[], savedAt)
+- Firebase Storage path for screenshots (`inspirations/{uid}/{filename}`)
 - Inspiration library referenced by persona agent during content generation ("here are posts this user admires")
 
 #### Feature 4.3 — Feed Insights from Inspiration Library
@@ -243,7 +244,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 **Acceptance Criteria:**
 - Manifest V3 extension with: background service worker, content script for linkedin.com, popup HTML/JS
 - Extension stored in /extension subfolder of repo with its own package.json and build config
-- Auth handoff: extension reads Supabase session token from chrome.storage.local (set by web app on login)
+- Auth handoff: extension reads Firebase ID token from chrome.storage.local (set by web app on login)
 - Popup shows logged-in state (user name, avatar) if session valid; "Open LinkedBloom" CTA if not
 - Extension icon shows green dot when active/monitoring, grey when paused
 - Permission prompt shown on first install: clear plain-English explanation of what is monitored and what stays local
@@ -272,7 +273,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 - Clicking badge opens a non-blocking overlay panel anchored to the post
 - Overlay shows: 3 comment suggestions (same logic as Feature 4.1 but triggered from extension)
 - Each suggestion: persona-aware, different approach (extend/question/challenge), character count shown
-- Overlay calls LinkedBloom API (Edge Function) with post text + user persona — requires active session
+- Overlay calls LinkedBloom API (Cloud Function) with post text + user persona — requires active session
 - "Use this comment" inserts the selected comment text into LinkedIn's native comment box
 - User can edit the inserted text before posting — extension does not post on user's behalf
 - "Regenerate" button fetches 3 new suggestions with different angles
@@ -289,7 +290,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 - "Draft from this post" option in LinkedBloom badge context menu on any post
 - On click: post text, author, URL captured and sent to LinkedBloom API
 - Gemini generates a draft post inspired by (not copying) the captured content, using user's persona
-- Draft saved to posts table with status 'draft', source_inspiration_url stored
+- Draft saved to the posts subcollection with status 'draft', sourceInspirationUrl stored
 - Popup notification: "Draft created — review in LinkedBloom" with link
 - User must navigate to web app to review, edit, and publish — no in-extension editing
 - Capture works on posts, articles, and reposts
@@ -321,7 +322,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 - Each sample: user annotates what they like about it (tone, format, topic, visual style) — free text + suggested tags
 - Video/talk URL input: YouTube or LinkedIn video links; system extracts transcript via API for analysis
 - Visual aesthetic board: user selects from 12 visual style cards (minimalist, data-heavy, storytelling, etc.)
-- All taste samples stored in inspirations table with type='taste_sample' flag
+- All taste samples stored in the inspirations subcollection with type='taste_sample' flag
 - Persona agent re-runs with taste samples in context on next scheduled refresh
 - Changes to taste intake trigger persona refresh prompt (not automatic — user confirms)
 
@@ -336,7 +337,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 - Persona agent re-runs with: original onboarding data + all posts written since last refresh + chat history + new refresh answers
 - New persona shown as diff vs previous: what changed, what stayed the same
 - User can accept full refresh, accept partial (select which changes to apply), or keep current
-- Previous persona version saved to personas table as archived record (non-destructive)
+- Previous persona version archived (non-destructive) to `users/{uid}/personaHistory/{version}` before the new persona overwrites `persona/main`
 - Refresh can be manually triggered at any time from Settings
 
 #### Feature 6.3 — Behavioral Persona Enrichment from Extension
@@ -345,7 +346,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 
 **Acceptance Criteria:**
 - Extension tracks locally: topics of posts user lingers on (>5s), topics user comments on, accounts user regularly engages with
-- Weekly summary of engagement patterns synced to Supabase (abstracted, not raw): top 3 topics engaged with, engagement style (question-asker vs opinion-sharer vs information-seeker)
+- Weekly summary of engagement patterns synced to the `extensionEvents` Firestore subcollection (abstracted, not raw): top 3 topics engaged with, engagement style (question-asker vs opinion-sharer vs information-seeker)
 - Persona agent receives behavioral summary alongside stated preferences on next refresh
 - Behavioral data shown to user in "What we learned this week" card on dashboard
 - User can correct any behavioral inference ("I engaged with these posts out of curiosity, not because it's my focus area")
@@ -364,7 +365,7 @@ Settings page, notifications, content templates, post import, mobile layout.
 - In-app notification bell icon with unread count
 - Notification types: post reminder, post published confirmation, metrics milestone (first 100 impressions, etc.)
 - Notification preferences toggle per type in Settings
-- Email sending via Supabase Edge Function + Resend or SendGrid
+- Email sending via a Cloud Function + Resend or SendGrid
 
 #### Feature 7.2 — Content Templates Library
 **Requirement:** Pre-built prompt templates for common post types to speed up content generation.
@@ -383,8 +384,8 @@ Settings page, notifications, content templates, post import, mobile layout.
 **Acceptance Criteria:**
 - "Import LinkedIn posts" option in Settings (requires LinkedIn connected)
 - Fetches up to 50 most recent posts from LinkedIn API
-- Imported posts stored with source='linkedin_import' flag in posts table with status='published'
-- Import does not duplicate posts already tracked (deduplicated by linkedin_post_id)
+- Imported posts stored with source='linkedin_import' flag in the posts subcollection with status='published'
+- Import does not duplicate posts already tracked (deduplicated by linkedinPostId)
 - Performance metrics fetched for each imported post (impressions, reactions, etc.)
 - Imported posts included in analytics dashboard calculations
 - Persona agent can reference imported posts as writing samples on next refresh

@@ -1,6 +1,7 @@
 # Business Requirements Document (BRD)
 ## LinkedBloom Scribe — Agentic Personal Branding Platform
-**Version:** 1.0 | **Date:** May 2026 | **Owner:** Sourav Bhat | **Status:** Approved
+**Version:** 1.1 | **Date:** May 2026 | **Owner:** Sourav Bhat | **Status:** Approved
+**Change from v1.0:** Backend references updated from Supabase to Firebase to match TRD v2.0.
 
 ---
 
@@ -89,13 +90,13 @@ The advancement of LLMs with long context windows, memory persistence, and multi
 - LinkedIn API permits posting, analytics retrieval, and OAuth for developer-tier applications during beta
 - Chrome Manifest V3 is the required extension format
 - Users are comfortable installing a Chrome extension and granting monitored permissions with full transparency
-- Supabase handles auth, database, storage, and Edge Functions for the full beta duration
+- Firebase handles auth, database (Firestore), storage, and Cloud Functions for the full beta duration
 
 ### 6.2 Constraints
 - 3-month closed beta timeline (6 × 2-week sprints)
 - AI-assisted solo development — complexity per sprint must be manageable
 - LinkedIn API rate limits apply to all publishing and analytics calls
-- Supabase free/pro tier limits apply
+- Firebase Blaze plan usage limits apply
 - Chrome Web Store review process may delay extension — sideloading acceptable for closed beta
 - No human engineering hours — Claude Code executes all implementation
 
@@ -105,9 +106,9 @@ The advancement of LLMs with long context windows, memory persistence, and multi
 
 | Metric | Target | How Measured |
 |--------|--------|-------------|
-| Weekly Active Users | ≥80% of beta cohort | Supabase auth events |
-| Draft approval rate (no/minor edits) | ≥75% by Sprint 6 | Edit delta tracking on posts table |
-| Posts published to LinkedIn per user/month | ≥4 | post_analytics table |
+| Weekly Active Users | ≥80% of beta cohort | Firebase Auth events |
+| Draft approval rate (no/minor edits) | ≥75% by Sprint 6 | Edit delta tracking on `posts` subcollection |
+| Posts published to LinkedIn per user/month | ≥4 | `postAnalytics` subcollection |
 | LinkedIn engagement uplift | 3× vs baseline | LinkedIn API metrics |
 | NPS score | ≥50 | Monthly survey |
 | Chrome extension install rate | ≥60% of beta users | Extension event tracking |

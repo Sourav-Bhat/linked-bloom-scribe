@@ -1,6 +1,7 @@
 # Product Backlog
 ## LinkedBloom Scribe — Full Sprint Backlog
-**Version:** 1.0 | **Date:** May 2026 | **Format:** Epic > Feature > User Story
+**Version:** 1.1 | **Date:** May 2026 | **Format:** Epic > Feature > User Story
+**Change from v1.0:** Backend references updated from Supabase/Postgres to Firebase/Firestore to match TRD v2.0.
 
 ---
 
@@ -18,8 +19,8 @@
 - [ ] Code committed to main branch
 - [ ] No TypeScript errors
 - [ ] No console errors in browser
-- [ ] Supabase RLS policies applied to any new tables
-- [ ] Edge Functions deployed to Supabase
+- [ ] Firestore security rules cover any new collection paths
+- [ ] New Cloud Functions deployed to Firebase
 - [ ] Tested manually against acceptance criteria
 - [ ] Responsive on desktop (1280px) and mobile (375px) unless noted otherwise
 
@@ -30,21 +31,20 @@
 
 ---
 
-### Feature 1.1 — Posts Table DB Migration
+### Feature 1.1 — Posts Data Model Completeness
 
 ---
 
-#### US-001: Add missing columns to posts table
+#### US-001: Extend Post type and Firestore security rules to cover all post fields
 **As a** developer  
-**I want to** run a DB migration that adds all missing columns to the posts table  
+**I want to** update the `Post` TypeScript type and Firestore security rules so every field the app uses is supported  
 **So that** no application data is silently lost when saving or loading posts
 
 **Acceptance Criteria:**
-- [ ] Migration file created at supabase/migrations/[timestamp]_add_posts_columns.sql
-- [ ] Migration adds: hashtags text[], topic text, tone text, instructions text, post_length text, versions jsonb DEFAULT '[]'::jsonb, scheduled_at timestamptz, published_at timestamptz, linkedin_post_id text, source_inspiration_url text, performance_data jsonb
-- [ ] Migration runs without error on existing DB with existing post rows
-- [ ] All existing post rows unaffected (NULL values in new columns)
-- [ ] Migration is idempotent (can be run twice without error)
+- [ ] `Post` type (`src/lib/types.ts`) includes: hashtags (string[]), topic (string), tone (string), instructions (string), postLength (string), versions (array, default []), scheduledAt (Timestamp | null), publishedAt (Timestamp | null), linkedinPostId (string | null), sourceInspirationUrl (string | null), performanceData (object | null)
+- [ ] Firestore security rules cover the full `users/{uid}/posts/{postId}` path
+- [ ] No migration step required — Firestore is schemaless, so existing post documents are unaffected and missing fields simply read as undefined until the next write
+- [ ] Change is idempotent by nature (re-deploying rules/types has no side effects on existing documents)
 
 **Dependencies:** None  
 **Sprint:** S1
@@ -57,12 +57,12 @@
 **So that** I can see exactly how each post was created and regenerate with the same settings
 
 **Acceptance Criteria:**
-- [ ] contentService.createPost() writes all fields: topic, tone, instructions, post_length, hashtags to DB
+- [ ] contentService.createPost() writes all fields: topic, tone, instructions, postLength, hashtags to the `users/{uid}/posts/{postId}` document
 - [ ] contentService.updatePost() updates all fields on save
-- [ ] contentService.getPost() returns all fields including new columns
+- [ ] contentService.getPost() returns all fields including the newly added ones
 - [ ] contentService.getPosts() (list) returns all fields
 - [ ] No TypeScript type errors — Post type updated to include all new fields
-- [ ] Existing posts load without error (nullable fields handled gracefully)
+- [ ] Existing posts load without error (missing/undefined fields handled gracefully)
 
 **Dependencies:** US-001  
 **Sprint:** S1
@@ -75,8 +75,8 @@
 **So that** I can go back to a previous draft even after refreshing the page
 
 **Acceptance Criteria:**
-- [ ] Every call to generate-content Edge Function appends a new version entry to versions JSONB array on the post record
-- [ ] Version object shape: { version_number: number, content: string, title: string, hashtags: string[], generated_at: ISO string, model_used: string, instructions_used: string }
+- [ ] Every call to the generateContent Cloud Function appends a new version entry to the versions array on the post document
+- [ ] Version object shape: { versionNumber: number, content: string, title: string, hashtags: string[], generatedAt: ISO string, modelUsed: string, instructionsUsed: string }
 - [ ] Version number auto-increments from current array length
 - [ ] Regeneration with feedback also creates a new version (previous draft not overwritten)
 - [ ] ContentPreview component renders version history list with version number and generated_at timestamp
@@ -94,17 +94,17 @@
 
 ---
 
-#### US-004: Replace calendar mock data with live Supabase query
+#### US-004: Replace calendar mock data with a live Firestore query
 **As a** user  
 **I want to** see my actual scheduled and published posts on the calendar  
 **So that** I can understand my real posting schedule at a glance
 
 **Acceptance Criteria:**
-- [ ] Calendar component fetches posts from Supabase filtered by: status IN ('scheduled', 'published') AND user_id = auth.uid()
-- [ ] Posts displayed on correct calendar date based on scheduled_at (scheduled posts) or published_at (published posts)
+- [ ] Calendar component queries `users/{uid}/posts` filtered by status IN ('scheduled', 'published') (uid scoped automatically by the nested path)
+- [ ] Posts displayed on correct calendar date based on scheduledAt (scheduled posts) or publishedAt (published posts)
 - [ ] Loading skeleton shown while data fetches
 - [ ] Empty state shown when no scheduled or published posts exist
-- [ ] Calendar updates in real time when a post is scheduled or unscheduled in the same session (Supabase realtime or refetch on navigation)
+- [ ] Calendar updates in real time when a post is scheduled or unscheduled in the same session (Firestore `onSnapshot` listener or refetch on navigation)
 - [ ] All hardcoded initialScheduledContent mock data removed from codebase
 
 **Dependencies:** US-001  
@@ -121,7 +121,7 @@
 - [ ] "Schedule Post" button on post review/final status page opens a date-time picker
 - [ ] Date-time picker shows user's local timezone
 - [ ] Cannot select a date in the past
-- [ ] On confirm: post status updated to 'scheduled', scheduled_at set to chosen datetime in DB
+- [ ] On confirm: post status updated to 'scheduled', scheduledAt set to chosen datetime in Firestore
 - [ ] Success toast: "Post scheduled for [date/time]"
 - [ ] Post appears on calendar on correct date immediately after scheduling
 - [ ] Post status badge on drafts list updates to 'Scheduled' with date shown
@@ -139,8 +139,8 @@
 **Acceptance Criteria:**
 - [ ] Clicking a scheduled post on the calendar opens a post detail panel/modal
 - [ ] Panel shows: post title, content preview, current scheduled date, Reschedule button, Unschedule button, Edit button
-- [ ] Reschedule button opens date-time picker pre-filled with current scheduled_at
-- [ ] On reschedule confirm: scheduled_at updated in DB, calendar reflects new date immediately
+- [ ] Reschedule button opens date-time picker pre-filled with current scheduledAt
+- [ ] On reschedule confirm: scheduledAt updated in Firestore, calendar reflects new date immediately
 - [ ] Edit button navigates to post editor for full editing
 - [ ] Success toast shown on reschedule
 
@@ -157,10 +157,10 @@
 **Acceptance Criteria:**
 - [ ] Post detail panel on calendar has "Remove from schedule" button (NOT delete post — just unschedule)
 - [ ] Confirmation dialog: "Remove this post from your schedule? The draft will be saved."
-- [ ] On confirm: scheduled_at set to NULL, status reverted to 'draft', post disappears from calendar
+- [ ] On confirm: scheduledAt set to null, status reverted to 'draft', post disappears from calendar
 - [ ] Post still accessible in drafts list with status 'draft'
 - [ ] Separate "Delete post permanently" option in panel with two-step confirmation
-- [ ] Permanently deleted post removed from DB and disappears from all views
+- [ ] Permanently deleted post document removed from Firestore and disappears from all views
 
 **Dependencies:** US-004, US-005  
 **Sprint:** S1
@@ -194,9 +194,9 @@
 **So that** my persona and content generation always uses accurate information about me
 
 **Acceptance Criteria:**
-- [ ] Profile section shows form pre-filled with current values from profiles table
-- [ ] Editable fields: full_name, job_title (new column if not exists), industry, experience_level, location, linkedin_url, goal
-- [ ] Save button updates profiles table via Supabase client
+- [ ] Profile section shows form pre-filled with current values from the user's `users/{uid}` Firestore document
+- [ ] Editable fields: displayName, jobTitle, industry, experienceRange, location, linkedinUrl, futureGoal
+- [ ] Save button updates the `users/{uid}` document via the Firebase client SDK
 - [ ] Success toast on save
 - [ ] Validation: LinkedIn URL must be a valid linkedin.com/in/ URL format
 - [ ] Changes reflected immediately in sidebar user display (name/avatar)
@@ -215,10 +215,10 @@
 - [ ] API Keys section shows masked input fields for Gemini API key and OpenAI API key
 - [ ] Existing saved keys shown masked: "gm-••••••••••••••••xxxx" (last 4 chars visible)
 - [ ] "Update key" interaction: clear mask and allow re-entry
-- [ ] Save stores key encrypted in Supabase (api_keys table or profiles JSONB column — whichever exists)
-- [ ] "Remove key" clears the key from DB with confirmation
+- [ ] Save stores key encrypted in a field on the `users/{uid}` Firestore document
+- [ ] "Remove key" clears the key from the document with confirmation
 - [ ] Keys validated by making a test API call on save — error shown if key is invalid
-- [ ] Edge Functions read user's key from DB and use it for API calls (fall back to system key if user key not set)
+- [ ] Cloud Functions read the user's key from Firestore and use it for API calls (fall back to system key if user key not set)
 
 **Dependencies:** US-008  
 **Sprint:** S1
@@ -232,7 +232,7 @@
 
 **Acceptance Criteria:**
 - [ ] Notifications section shows toggle list: "Remind me 1h before scheduled post" (default ON), "Weekly digest email" (default ON), "Post published confirmation" (default ON), "Engagement milestones" (default OFF)
-- [ ] Toggles persist to profiles table (notification_preferences jsonb column)
+- [ ] Toggles persist to the `notificationPreferences` field on the `users/{uid}` document
 - [ ] Changes saved automatically on toggle (no explicit save button needed)
 - [ ] UI only — email sending wired in Sprint 5
 
@@ -249,9 +249,9 @@
 **Acceptance Criteria:**
 - [ ] Danger Zone section with red border styling and warning copy
 - [ ] "Delete all my data" button opens modal with: warning text listing what will be deleted, text input requiring user to type "DELETE" to confirm, red confirm button
-- [ ] On confirm: deletes all rows from posts, personas, chat_messages, post_analytics, engagements, inspirations, extension_events, linkedin_accounts where user_id = current user
-- [ ] Deletes all files from Supabase storage buckets belonging to user
-- [ ] Calls Supabase auth.admin.deleteUser() to delete auth account
+- [ ] On confirm: a Cloud Function cascade-deletes the entire `users/{uid}` document tree (persona, posts, chatMessages, postAnalytics, engagements, inspirations, extensionEvents, linkedinAccount subcollections)
+- [ ] Deletes all Firebase Storage files belonging to the user (admiredPosts/{uid}/, inspirations/{uid}/, tasteSamples/{uid}/)
+- [ ] Calls Firebase Admin SDK `auth().deleteUser(uid)` to delete the auth account
 - [ ] User redirected to landing/signup page after deletion
 - [ ] Action is irreversible — no soft delete
 
@@ -269,16 +269,16 @@
 
 ---
 
-#### US-013: Create linkedin_accounts DB table and migration
+#### US-013: Define linkedinAccount Firestore document and security rules
 **As a** developer  
-**I want to** have a secure DB table to store encrypted LinkedIn OAuth tokens  
+**I want to** have a secure Firestore location to store encrypted LinkedIn OAuth tokens  
 **So that** user tokens are persisted and retrievable for API calls
 
 **Acceptance Criteria:**
-- [ ] Migration creates linkedin_accounts table with all columns per TRD schema
-- [ ] RLS enabled: users can only read/write their own rows
-- [ ] Unique index on (user_id) WHERE is_active = true (one active connection per user)
-- [ ] Token columns are text type (will store AES-256 encrypted strings)
+- [ ] `users/{uid}/linkedinAccount/main` document shape defined per TRD Section 4.1 (one document per user — no uniqueness constraint needed since the path itself is unique per uid)
+- [ ] Firestore security rules restrict read/write on `linkedinAccount/main` to `request.auth.uid == uid`
+- [ ] Token fields (accessTokenEncrypted, refreshTokenEncrypted) are strings holding AES-256 encrypted values
+- [ ] `isActive` boolean field marks whether the connection is currently active
 
 **Dependencies:** None  
 **Sprint:** S2
@@ -292,13 +292,13 @@
 
 **Acceptance Criteria:**
 - [ ] "Connect LinkedIn" button in Settings → LinkedIn section initiates OAuth flow
-- [ ] Edge Function: linkedin-oauth-init generates PKCE code_verifier and code_challenge, stores code_verifier in Supabase session, returns LinkedIn authorization URL
+- [ ] Cloud Function: oauthInit generates PKCE code_verifier and code_challenge, stores code_verifier server-side (e.g. a short-lived Firestore doc keyed by state), returns LinkedIn authorization URL
 - [ ] User redirected to LinkedIn with: response_type=code, client_id, redirect_uri, scope, state (CSRF token), code_challenge, code_challenge_method=S256
 - [ ] OAuth callback route /auth/linkedin/callback defined in React Router
-- [ ] Edge Function: linkedin-oauth-callback receives code, verifies state, exchanges code for tokens using code_verifier
-- [ ] Tokens encrypted with AES-256 and stored in linkedin_accounts table
+- [ ] Cloud Function: oauthCallback receives code, verifies state, exchanges code for tokens using code_verifier
+- [ ] Tokens encrypted with AES-256 and stored in `users/{uid}/linkedinAccount/main`
 - [ ] User redirected back to Settings with success message
-- [ ] linkedin_member_id stored from /v2/me API call after successful token exchange
+- [ ] linkedinMemberId stored from /v2/me API call after successful token exchange
 
 **Dependencies:** US-013  
 **Sprint:** S2
@@ -330,7 +330,7 @@
 **Acceptance Criteria:**
 - [ ] "Disconnect" button in Settings → LinkedIn section
 - [ ] Confirmation modal: "Disconnect LinkedIn? Scheduled posts will not be published until you reconnect."
-- [ ] On confirm: linkedin_accounts row for user set to is_active = false, tokens cleared
+- [ ] On confirm: `users/{uid}/linkedinAccount/main` document updated with isActive = false, tokens cleared
 - [ ] Connection status updates to disconnected immediately
 - [ ] "Publish to LinkedIn" button disabled across app
 
@@ -345,11 +345,11 @@
 **So that** users never have to manually reconnect due to token expiry
 
 **Acceptance Criteria:**
-- [ ] Edge Function: linkedin-refresh-token fetches tokens for all users where token_expires_at < now() + interval '1 hour'
-- [ ] Calls LinkedIn token refresh endpoint with refresh_token
-- [ ] On success: updates access_token_encrypted, token_expires_at, last_refreshed_at in DB
-- [ ] On failure (refresh token expired): sets is_active = false, queues notification to user
-- [ ] Function invoked by Supabase pg_cron job every 30 minutes
+- [ ] Cloud Function: refreshLinkedinTokens queries all users' linkedinAccount documents where tokenExpiresAt < now() + 1 hour
+- [ ] Calls LinkedIn token refresh endpoint with refreshToken
+- [ ] On success: updates accessTokenEncrypted, tokenExpiresAt, lastRefreshedAt on the document
+- [ ] On failure (refresh token expired): sets isActive = false, queues notification to user
+- [ ] Function invoked by a Cloud Scheduler job every 30 minutes
 - [ ] Refresh operations logged (success/failure) without logging token values
 
 **Dependencies:** US-014  
@@ -361,18 +361,18 @@
 
 ---
 
-#### US-018: Create linkedin-publish-post Edge Function
+#### US-018: Create linkedinPublishPost Cloud Function
 **As a** developer  
-**I want to** have an Edge Function that posts content to LinkedIn on behalf of the user  
+**I want to** have a Cloud Function that posts content to LinkedIn on behalf of the user  
 **So that** the client app can publish without ever handling LinkedIn tokens
 
 **Acceptance Criteria:**
-- [ ] Edge Function: linkedin-publish-post accepts: post_id (uuid)
-- [ ] Fetches post content, title, hashtags from posts table
-- [ ] Fetches user's encrypted access token from linkedin_accounts, decrypts
-- [ ] Constructs LinkedIn UGC Post payload: author (urn:li:person:{member_id}), lifecycleState: PUBLISHED, specificContent with shareCommentary (content + hashtags)
+- [ ] Cloud Function: linkedinPublishPost accepts: postId (string)
+- [ ] Fetches post content, title, hashtags from `users/{uid}/posts/{postId}`
+- [ ] Fetches user's encrypted access token from `users/{uid}/linkedinAccount/main`, decrypts
+- [ ] Constructs LinkedIn UGC Post payload: author (urn:li:person:{linkedinMemberId}), lifecycleState: PUBLISHED, specificContent with shareCommentary (content + hashtags)
 - [ ] POSTs to LinkedIn /v2/ugcPosts
-- [ ] On success: updates post in DB — status='published', linkedin_post_id, published_at
+- [ ] On success: updates post document — status='published', linkedinPostId, publishedAt
 - [ ] On failure: returns structured error with LinkedIn API error code and message
 - [ ] Function never logs or returns decrypted token values
 
@@ -401,18 +401,18 @@
 
 ---
 
-#### US-020: Auto-publish scheduled posts via cron
+#### US-020: Auto-publish scheduled posts via Cloud Scheduler
 **As a** user  
 **I want to** have my scheduled posts published automatically at the scheduled time  
 **So that** I don't have to be online at the exact moment a post is due to go out
 
 **Acceptance Criteria:**
-- [ ] Supabase pg_cron job runs every 5 minutes
-- [ ] Cron queries posts WHERE status = 'scheduled' AND scheduled_at <= now() AND user_id in (select user_id from linkedin_accounts where is_active = true)
-- [ ] For each post found: calls linkedin-publish-post Edge Function
-- [ ] On success: post status updated to 'published', published_at set
-- [ ] On failure: post status set to 'publish_failed', error stored in performance_data jsonb, user notified
-- [ ] Cron never processes the same post twice (status check prevents reprocessing)
+- [ ] Cloud Scheduler triggers the publishScheduledPosts Cloud Function every 5 minutes
+- [ ] Function queries posts collection group WHERE status = 'scheduled' AND scheduledAt <= now(), restricted to users with an active linkedinAccount
+- [ ] For each post found: calls the linkedinPublishPost logic directly (or invokes the function)
+- [ ] On success: post status updated to 'published', publishedAt set
+- [ ] On failure: post status set to 'publish_failed', error stored in performanceData, user notified
+- [ ] Job never processes the same post twice (status check prevents reprocessing)
 
 **Dependencies:** US-018, US-017  
 **Sprint:** S2
@@ -426,7 +426,7 @@
 
 **Acceptance Criteria:**
 - [ ] Published posts display: "Published on LinkedIn" badge in green
-- [ ] "View on LinkedIn" button opens https://www.linkedin.com/feed/update/{linkedin_post_id} in new tab
+- [ ] "View on LinkedIn" button opens https://www.linkedin.com/feed/update/{linkedinPostId} in new tab
 - [ ] Published timestamp shown: "Published 2 hours ago"
 - [ ] Post content display is read-only (no edit button on published posts)
 - [ ] Published posts appear in a "Published" tab/filter in drafts list
@@ -441,34 +441,34 @@
 
 ---
 
-#### US-022: Create post_analytics table and migration
+#### US-022: Define postAnalytics Firestore subcollection
 **As a** developer  
-**I want to** have a DB table to store LinkedIn post performance metrics  
+**I want to** have a Firestore location to store LinkedIn post performance metrics  
 **So that** analytics can be displayed in the app without calling LinkedIn API on every page load
 
 **Acceptance Criteria:**
-- [ ] Migration creates post_analytics table per TRD schema
-- [ ] RLS enabled
-- [ ] Composite unique index on (post_id, fetch_period) to prevent duplicate period entries
-- [ ] Engagement rate computed column or calculated on insert
+- [ ] `users/{uid}/postAnalytics/{id}` document shape defined per TRD Section 4.1
+- [ ] Firestore security rules cover the `postAnalytics` subcollection path
+- [ ] Writes for a given (postId, fetchPeriod) pair upsert into the same document (e.g. deterministic doc ID `${postId}_${fetchPeriod}`) to prevent duplicate period entries
+- [ ] engagementRate calculated in the Cloud Function before writing the document
 
 **Dependencies:** US-001  
 **Sprint:** S2
 
 ---
 
-#### US-023: Create linkedin-fetch-analytics Edge Function
+#### US-023: Create fetchAnalytics Cloud Function
 **As a** developer  
-**I want to** have an Edge Function that fetches LinkedIn post metrics and stores them  
+**I want to** have a Cloud Function that fetches LinkedIn post metrics and stores them  
 **So that** analytics data is always up to date without the client polling LinkedIn directly
 
 **Acceptance Criteria:**
-- [ ] Edge Function: linkedin-fetch-analytics accepts: post_id (uuid), fetch_period (text)
-- [ ] Fetches linkedin_post_id from posts table
+- [ ] Cloud Function: fetchAnalytics accepts: postId (string), fetchPeriod (string)
+- [ ] Fetches linkedinPostId from the post document
 - [ ] Calls LinkedIn /v2/organizationalEntityShareStatistics with the post URN
 - [ ] Parses: impressions, reactions, comments, shares, clicks from response
-- [ ] Calculates engagement_rate = (reactions + comments + shares) / impressions * 100
-- [ ] Upserts to post_analytics table (update if same post_id + fetch_period exists)
+- [ ] Calculates engagementRate = (reactions + comments + shares) / impressions * 100
+- [ ] Upserts the `postAnalytics` document for (postId, fetchPeriod)
 - [ ] Handles LinkedIn API rate limiting with exponential backoff
 - [ ] Returns structured response with metrics
 
@@ -483,9 +483,9 @@
 **So that** I can see how my posts perform over time without manually requesting refreshes
 
 **Acceptance Criteria:**
-- [ ] On post publish: schedule analytics fetch jobs at +24h, +48h, +7d, +14d, +30d using pg_cron or Supabase scheduled functions
-- [ ] Each job calls linkedin-fetch-analytics with the correct fetch_period label
-- [ ] Jobs only run if LinkedIn account still connected (is_active = true)
+- [ ] On post publish: schedule analytics fetch jobs at +24h, +48h, +7d, +14d, +30d using Cloud Tasks (or a Cloud Scheduler job that sweeps due posts)
+- [ ] Each job calls fetchAnalytics with the correct fetchPeriod label
+- [ ] Jobs only run if LinkedIn account still connected (isActive = true)
 - [ ] Failed fetches retried up to 3 times with exponential backoff
 - [ ] Fetch jobs for deleted posts cleaned up
 
@@ -501,7 +501,7 @@
 
 **Acceptance Criteria:**
 - [ ] "Refresh metrics" button on published post analytics view
-- [ ] Calls linkedin-fetch-analytics with fetch_period='manual'
+- [ ] Calls fetchAnalytics with fetchPeriod='manual'
 - [ ] Loading state on button during fetch (disabled to prevent double-click)
 - [ ] Success: metrics updated, last fetched timestamp shown
 - [ ] Rate limited: button disabled for 15 minutes after last manual refresh
@@ -523,13 +523,13 @@
 **So that** I can understand my real reach and engagement at a glance
 
 **Acceptance Criteria:**
-- [ ] KPI card 1: Total Impressions (last 30 days) — sum from post_analytics
+- [ ] KPI card 1: Total Impressions (last 30 days) — sum from postAnalytics
 - [ ] KPI card 2: Total Reactions (last 30 days)
 - [ ] KPI card 3: Average Engagement Rate (last 30 days) — mean across all posts
-- [ ] KPI card 4: Posts Published (last 30 days) — count from posts table
+- [ ] KPI card 4: Posts Published (last 30 days) — count from posts subcollection
 - [ ] Each KPI card shows trend: +X% vs previous 30 days (requires 60 days of data; otherwise shows "Not enough data")
 - [ ] All mock KPI data removed
-- [ ] Data sourced from post_analytics via Supabase query (not from LinkedIn API directly)
+- [ ] Data sourced from the postAnalytics subcollection via Firestore query (not from LinkedIn API directly)
 - [ ] Dashboard shows "Connect LinkedIn to see real metrics" CTA if not connected
 
 **Dependencies:** US-022, US-023  
@@ -563,7 +563,7 @@
 **Acceptance Criteria:**
 - [ ] "Analytics" tab on post detail view (only visible for published posts)
 - [ ] Metrics displayed: impressions, reactions, comments, shares, clicks, engagement rate
-- [ ] Engagement timeline: table or chart showing metrics at each fetch_period (24h, 48h, 7d, 14d, 30d)
+- [ ] Engagement timeline: table or chart showing metrics at each fetchPeriod (24h, 48h, 7d, 14d, 30d)
 - [ ] Comparison to user's average: "Your average engagement rate is X% — this post performed Y% above/below average"
 - [ ] "What worked" AI insight: one short paragraph from Gemini analysing the post content + metrics
 - [ ] AI insight generated on first view, cached in post record — not regenerated on every view
@@ -602,9 +602,9 @@
 
 **Acceptance Criteria:**
 - [ ] "Import LinkedIn posts" button in Settings → LinkedIn section
-- [ ] Edge Function: linkedin-import-posts fetches up to 50 most recent posts from LinkedIn API
-- [ ] Each imported post stored in posts table with: status='published', source='linkedin_import', content, published_at, linkedin_post_id
-- [ ] Deduplication: if linkedin_post_id already exists in DB, skip
+- [ ] Cloud Function: importPosts fetches up to 50 most recent posts from LinkedIn API
+- [ ] Each imported post stored in the posts subcollection with: status='published', source='linkedin_import', content, publishedAt, linkedinPostId
+- [ ] Deduplication: if linkedinPostId already exists in Firestore, skip
 - [ ] After import: linkedin-fetch-analytics triggered for each imported post
 - [ ] Progress indicator during import with count: "Importing 12 of 50 posts..."
 - [ ] Success message: "Imported 47 posts. 3 were already in your library."
@@ -625,29 +625,29 @@
 
 ---
 
-#### US-031: Create engagements DB table
+#### US-031: Define engagements Firestore subcollection
 **As a** developer  
-**I want to** have a DB table to store comment drafting sessions  
+**I want to** have a Firestore location to store comment drafting sessions  
 **So that** users can review and track their engagement history
 
 **Acceptance Criteria:**
-- [ ] Migration creates engagements table per TRD schema
-- [ ] RLS enabled
-- [ ] Indexes on user_id and created_at
+- [ ] `users/{uid}/engagements/{id}` document shape defined per TRD schema
+- [ ] Firestore security rules cover the `engagements` subcollection path
+- [ ] Client queries order by createdAt (no separate index needed — the subcollection is already scoped to the user)
 
 **Dependencies:** US-001  
 **Sprint:** S4
 
 ---
 
-#### US-032: Create generate-comment-options Edge Function
+#### US-032: Create generateCommentOptions Cloud Function
 **As a** developer  
-**I want to** have an Edge Function that generates persona-aware comment options  
+**I want to** have a Cloud Function that generates persona-aware comment options  
 **So that** both the web app and Chrome extension can use the same comment generation logic
 
 **Acceptance Criteria:**
-- [ ] Edge Function: generate-comment-options accepts: source_post_text (string), source_post_url (optional string), user_id (from JWT)
-- [ ] Fetches user's active persona from personas table
+- [ ] Cloud Function: generateCommentOptions accepts: sourcePostText (string), sourcePostUrl (optional string); uid derived from the Firebase ID token
+- [ ] Fetches user's active persona from `users/{uid}/persona/main`
 - [ ] Gemini prompt generates exactly 3 comment options with different approaches: (1) agree-and-extend: adds a complementary insight, (2) clarifying question: asks a thoughtful follow-up, (3) respectful challenge: offers a different perspective
 - [ ] Each comment: max 200 words, written in user's voice (uses voice_profile from persona), no generic openers like "Great post!", no emojis unless user's voice profile includes them
 - [ ] Returns array of 3 comment objects: { approach: string, comment: string, character_count: number }
@@ -674,7 +674,7 @@
 - [ ] Each card: "Copy to clipboard" button, inline edit capability (textarea), "Save engagement" button
 - [ ] "Regenerate all" button fetches 3 new options
 - [ ] "Regenerate this one" button on each card regenerates just that approach
-- [ ] Saving engagement stores to engagements table with source_post_url, comment_options, selected_comment
+- [ ] Saving engagement stores to the engagements subcollection with sourcePostUrl, commentOptions, selectedComment
 - [ ] History tab on /engage page shows past engagement sessions (last 20)
 
 **Dependencies:** US-032  
@@ -686,16 +686,16 @@
 
 ---
 
-#### US-034: Create inspirations DB table and storage bucket
+#### US-034: Define inspirations Firestore subcollection and Storage path
 **As a** developer  
-**I want to** have a DB table and storage bucket for the inspiration library  
+**I want to** have a Firestore location and Storage path for the inspiration library  
 **So that** users can save and retrieve LinkedIn posts that inspire them
 
 **Acceptance Criteria:**
-- [ ] Migration creates inspirations table per TRD schema
-- [ ] RLS enabled
-- [ ] Supabase storage bucket 'inspirations' created with private access (user-scoped policies)
-- [ ] Storage policy: users can only read/write objects under their own user_id path prefix
+- [ ] `users/{uid}/inspirations/{id}` document shape defined per TRD schema
+- [ ] Firestore security rules cover the `inspirations` subcollection path
+- [ ] Firebase Storage path `inspirations/{uid}/{filename}` defined with private, user-scoped access
+- [ ] Storage rules: users can only read/write objects under their own uid path prefix
 
 **Dependencies:** None  
 **Sprint:** S4
@@ -711,7 +711,7 @@
 - [ ] New route /inspiration accessible from sidebar
 - [ ] "Add inspiration" button opens slide-over panel
 - [ ] Add form fields: LinkedIn post URL (optional), post text (paste, required if no URL), author name (optional), personal note/takeaway (optional), topic tags (free text, comma-separated, auto-suggests user's content pillars)
-- [ ] Screenshot upload: drag-and-drop or file picker, stores in Supabase storage
+- [ ] Screenshot upload: drag-and-drop or file picker, stores in Firebase Storage
 - [ ] On save: stored to inspirations table, screenshot uploaded to storage if provided
 - [ ] Inspiration cards grid: shows screenshot thumbnail (or placeholder), source URL link, note preview, tags, date saved
 - [ ] Search bar: filters by keyword across source_text and note fields
@@ -804,13 +804,13 @@
 **So that** I don't have to log in twice
 
 **Acceptance Criteria:**
-- [ ] Web app writes Supabase JWT to chrome.storage.local under key 'lb_session' on login
-- [ ] Web app clears 'lb_session' from chrome.storage.local on logout
-- [ ] Extension popup reads 'lb_session' on open
-- [ ] If valid JWT found: popup shows logged-in state (user name fetched from JWT claims)
-- [ ] If no JWT or expired: popup shows "Open LinkedBloom to log in" with link to web app
-- [ ] Extension service worker checks session validity before any API calls
-- [ ] Session check uses Supabase JWT verification (expiry check) — no additional API call needed
+- [ ] Web app writes the Firebase ID token to chrome.storage.local under key 'lb_firebase_token' (plus uid and expiry) on login
+- [ ] Web app clears 'lb_firebase_token' from chrome.storage.local on logout
+- [ ] Extension popup reads 'lb_firebase_token' on open
+- [ ] If a valid token is found: popup shows logged-in state (user name fetched from cached profile data)
+- [ ] If no token or expired: popup shows "Open LinkedBloom to log in" with link to web app
+- [ ] Extension service worker checks token validity before any API calls
+- [ ] Session check uses the cached expiry timestamp (no additional API call needed); token refreshed by re-opening the web app before expiry
 
 **Dependencies:** US-038  
 **Sprint:** S5
@@ -926,7 +926,7 @@
 - [ ] Overlay width: 340px, positioned to not obscure post content
 - [ ] Overlay header: LinkedBloom logo, post author name, "×" close button
 - [ ] Loading state: skeleton cards while API call in progress
-- [ ] API call: sends post text to generate-comment-options Edge Function with user JWT
+- [ ] API call: sends post text to the generateCommentOptions Cloud Function with the user's Firebase ID token
 - [ ] Three comment cards displayed with approach label and comment text
 - [ ] Character count on each card (turns amber >800, red >1,200)
 - [ ] "Use this comment" button on each card
@@ -970,9 +970,9 @@
 
 **Acceptance Criteria:**
 - [ ] Right-click or secondary click on badge shows context menu with options: "Draft a comment", "Capture as draft inspiration", "Save to inspiration library", "Dismiss"
-- [ ] "Capture as draft inspiration" sends post text + URL to generate-draft-from-capture Edge Function
-- [ ] Edge Function: Gemini generates a new post inspired by (not copying) the captured content, using user's persona
-- [ ] Draft saved to posts table with status='draft', source_inspiration_url=captured post URL, topic auto-detected from content
+- [ ] "Capture as draft inspiration" sends post text + URL to the generateDraftFromCapture Cloud Function
+- [ ] Cloud Function: Gemini generates a new post inspired by (not copying) the captured content, using user's persona
+- [ ] Draft saved to the posts subcollection with status='draft', sourceInspirationUrl=captured post URL, topic auto-detected from content
 - [ ] Popup notification (chrome.notifications): "Draft created — review in LinkedBloom" with button opening web app
 - [ ] Context menu dismisses after selection
 - [ ] Works on all LinkedIn post types: standard posts, articles, reposts
@@ -1019,7 +1019,7 @@
 - [ ] Upload up to 10 content samples: supported types — text (paste), image (upload), screenshot (upload), URL
 - [ ] For each sample: annotation field "What do you like about this?" (free text) + tag selector (tone, format, topic, visual style)
 - [ ] Visual style selector: 12 cards with labels (minimalist, data-driven, storytelling, etc.) — user picks up to 3
-- [ ] All samples stored in inspirations table with type='taste_sample'
+- [ ] All samples stored in the inspirations subcollection with type='taste_sample'
 - [ ] "Update persona with these samples" button triggers persona refresh with taste samples in context
 - [ ] User sees confirmation: "Your persona will be updated to reflect your taste preferences"
 
@@ -1042,7 +1042,7 @@
 - [ ] After answers collected: new persona generated with: original onboarding data + all posts since last refresh + chat history + refresh conversation
 - [ ] New persona shown as diff view: changed sections highlighted, unchanged sections greyed
 - [ ] User options: Accept all changes, Accept selected changes (toggle per section), Keep current persona
-- [ ] Previous persona archived in personas table (is_active=false, version incremented)
+- [ ] Previous persona archived to `users/{uid}/personaHistory/{version}` (isActive=false, version incremented) before `persona/main` is overwritten
 - [ ] Manual trigger: "Refresh persona now" button in Settings → Persona
 
 **Dependencies:** US-009  
@@ -1058,7 +1058,7 @@
 **Acceptance Criteria:**
 - [ ] Opt-in toggle in extension privacy settings: "Share weekly engagement patterns to improve my persona" (default OFF)
 - [ ] When opted in: extension compiles weekly summary every 7 days from local data: top 3 topics engaged with (liked/commented on), engagement style pattern (question-asker / opinion-sharer / information-seeker), post scan count, comment draft count
-- [ ] Summary synced to extension_events table (not raw data)
+- [ ] Summary synced to the extensionEvents subcollection (not raw data)
 - [ ] "What we learned this week" card on dashboard: shows current week's behavioral summary in plain English
 - [ ] User can correct any inference: "Mark as inaccurate" on any behavioural insight
 - [ ] Corrections stored as notes in extension_events row
@@ -1079,7 +1079,7 @@
 **So that** I never miss a scheduled post and always know how my LinkedIn presence is performing
 
 **Acceptance Criteria:**
-- [ ] Resend API integrated via Edge Function: send-notification-email
+- [ ] Resend API integrated via Cloud Function: sendEmail
 - [ ] Reminder email: sent 1 hour before scheduled_at for each post WHERE status='scheduled' AND user has reminder notifications enabled
 - [ ] Reminder email content: post title, scheduled time, "View post" deep link, "Reschedule" deep link
 - [ ] Weekly digest email: sent every Monday 8am user local time (approximated by timezone in profile)

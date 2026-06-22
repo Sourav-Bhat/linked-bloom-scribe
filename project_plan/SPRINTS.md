@@ -1,6 +1,7 @@
 # Sprint Execution Guide
 ## LinkedBloom Scribe — Instructions for Claude Code
-**Version:** 1.0 | **Date:** May 2026
+**Version:** 1.1 | **Date:** May 2026
+**Change from v1.0:** Backend references updated from Supabase/Postgres to Firebase/Firestore to match TRD v2.0.
 
 ---
 
@@ -18,7 +19,7 @@ This guide is written for **Claude Code** executing the LinkedBloom Scribe proje
 **Reference documents in /project-documents/:**
 - `BRD.md` — Business context and rules
 - `PRD.md` — Full feature requirements
-- `TRD.md` — Technical architecture, DB schema, Edge Function specs
+- `TRD.md` — Technical architecture, Firestore data model, Cloud Function specs
 - `BACKLOG.md` — Full user stories with acceptance criteria
 - `LinkedBloom_Project_Backlog.xlsx` — Same backlog in spreadsheet format
 
@@ -30,8 +31,8 @@ Before marking any story complete:
 - [ ] Code committed to main branch with descriptive commit message referencing story ID
 - [ ] No TypeScript compilation errors (`npx tsc --noEmit` passes)
 - [ ] No console errors in browser on affected pages
-- [ ] Supabase RLS policies applied to any new tables
-- [ ] New Edge Functions deployed to Supabase
+- [ ] Firestore security rules cover any new collection paths
+- [ ] New Cloud Functions deployed to Firebase
 - [ ] All acceptance criteria from BACKLOG.md manually verified
 - [ ] Responsive layout not broken (test at 1280px and 375px)
 
@@ -43,11 +44,10 @@ Before marking any story complete:
 
 ### Story Execution Order
 
-#### 1. US-001 — Posts Table DB Migration
-- Read TRD.md Section 3.2 for exact column specifications
-- Create migration file: `supabase/migrations/[timestamp]_add_posts_columns.sql`
-- Run migration locally and verify no errors
-- Verify existing rows unaffected
+#### 1. US-001 — Posts Data Model Completeness
+- Read TRD.md Section 4.1/4.2 for the exact field specifications
+- Update `Post` type in `src/lib/types.ts` and Firestore security rules for `users/{uid}/posts/{postId}`
+- No migration to run — Firestore is schemaless; verify existing documents are unaffected
 
 #### 2. US-002 — Update contentService
 - Depends on: US-001
@@ -57,19 +57,19 @@ Before marking any story complete:
 
 #### 3. US-003 — Version History Persistence
 - Depends on: US-001, US-002
-- Modify generate-content Edge Function to append version objects
+- Modify the generateContent Cloud Function to append version objects
 - Update ContentPreview component to show version list
 - Add Restore button functionality
 
 #### 4. US-004 — Calendar Real Data
 - Depends on: US-001
-- Locate Calendar component, replace `initialScheduledContent` with Supabase query
+- Locate Calendar component, replace `initialScheduledContent` with a Firestore query against `users/{uid}/posts`
 - Add loading skeleton and empty state
 
 #### 5. US-005 — Schedule Post from Review Page
 - Depends on: US-001, US-004
 - Add "Schedule Post" button and date-time picker to post review page
-- Wire to Supabase update
+- Wire to a Firestore document update
 
 #### 6. US-006 — Reschedule from Calendar
 - Depends on: US-004, US-005
@@ -87,7 +87,7 @@ Before marking any story complete:
 
 #### 9. US-009 — Profile Edit in Settings
 - Depends on: US-008
-- Build profile form section in Settings, wired to Supabase
+- Build profile form section in Settings, wired to the `users/{uid}` Firestore document
 
 #### 10. US-010 — API Keys in Settings
 - Depends on: US-008
@@ -95,18 +95,18 @@ Before marking any story complete:
 
 #### 11. US-011 — Notification Preferences in Settings
 - Depends on: US-008
-- Build toggles section, persist to profiles.notification_preferences
+- Build toggles section, persist to the `notificationPreferences` field on `users/{uid}`
 
 #### 12. US-012 — Danger Zone in Settings
 - Depends on: US-008
 - Build Danger Zone with cascade delete flow
 
 ### Sprint 1 Complete When:
-- [ ] Calendar shows real posts from DB (no mock data)
-- [ ] Scheduling, rescheduling, unscheduling all persist to Supabase
+- [ ] Calendar shows real posts from Firestore (no mock data)
+- [ ] Scheduling, rescheduling, unscheduling all persist to Firestore
 - [ ] /settings loads without 404
 - [ ] All settings sections functional (profile, API keys, notifications, danger zone)
-- [ ] Post generation saves topic, tone, instructions, hashtags, length to DB
+- [ ] Post generation saves topic, tone, instructions, hashtags, length to Firestore
 - [ ] Version history persists across page refreshes
 - [ ] No console errors on any page
 
@@ -118,15 +118,15 @@ Before marking any story complete:
 
 ### Story Execution Order
 
-#### 1. US-013 — linkedin_accounts Table
-- Create migration for linkedin_accounts table per TRD.md Section 3.2
-- Apply RLS and unique index
+#### 1. US-013 — linkedinAccount Document
+- Define `users/{uid}/linkedinAccount/main` document shape per TRD.md Section 4.1
+- Apply Firestore security rules for that path
 
 #### 2. US-014 — LinkedIn OAuth PKCE Flow
 - Depends on: US-013
-- Read TRD.md Section 6 for LinkedIn API scope details
-- Create two Edge Functions: `linkedin-oauth-init` and `linkedin-oauth-callback`
-- Create `encrypt-decrypt-token` utility Edge Function first (called by callback)
+- Read TRD.md Section 12 for LinkedIn API scope details
+- Create two Cloud Functions: `oauthInit` and `oauthCallback` (functions/src/linkedin/)
+- Create `encryptDecrypt.ts` utility first (called by callback)
 - Add /auth/linkedin/callback route to React Router
 - Add "Connect LinkedIn" button in Settings
 - Test full OAuth flow end to end
@@ -143,16 +143,16 @@ Before marking any story complete:
 
 #### 5. US-017 — Automatic Token Refresh
 - Depends on: US-014
-- Create `linkedin-refresh-token` Edge Function
-- Set up pg_cron job (every 30 minutes) in Supabase dashboard or via SQL
+- Create `refreshLinkedinTokens` Cloud Function (functions/src/linkedin/refreshToken.ts)
+- Set up a Cloud Scheduler job (every 30 minutes) to trigger it
 
-#### 6. US-022 — post_analytics Table
+#### 6. US-022 — postAnalytics Subcollection
 - No dependencies — can run in parallel with US-017
-- Create migration for post_analytics table per TRD.md Section 3.2
+- Define `users/{uid}/postAnalytics/{id}` document shape per TRD.md Section 4.1
 
-#### 7. US-018 — linkedin-publish-post Edge Function
+#### 7. US-018 — linkedinPublishPost Cloud Function
 - Depends on: US-014, US-013
-- Create Edge Function that publishes to LinkedIn /v2/ugcPosts
+- Create Cloud Function that publishes to LinkedIn /v2/ugcPosts
 - Test with a real LinkedIn account
 
 #### 8. US-019 — Publish Button on Post Review
@@ -162,7 +162,7 @@ Before marking any story complete:
 
 #### 9. US-020 — Auto-Publish Scheduled Posts
 - Depends on: US-018, US-017
-- Set up pg_cron job querying scheduled posts
+- Set up a Cloud Scheduler job querying scheduled posts
 - Handle publish_failed status and error storage
 
 #### 10. US-021 — Published Post UI
@@ -170,9 +170,9 @@ Before marking any story complete:
 - Update post cards and detail view with published state
 - Add "View on LinkedIn" link
 
-#### 11. US-023 — linkedin-fetch-analytics Edge Function
+#### 11. US-023 — fetchAnalytics Cloud Function
 - Depends on: US-022, US-014
-- Create analytics fetch Edge Function with backoff handling
+- Create analytics fetch Cloud Function with backoff handling
 
 #### 12. US-024 — Scheduled Analytics Fetches
 - Depends on: US-023, US-019
@@ -187,8 +187,8 @@ Before marking any story complete:
 - [ ] User can disconnect and reconnect
 - [ ] Tokens refresh automatically before expiry
 - [ ] "Publish to LinkedIn" button sends post to LinkedIn
-- [ ] Published post shows linkedin_post_id and "View on LinkedIn" link
-- [ ] Scheduled posts auto-publish via cron
+- [ ] Published post shows linkedinPostId and "View on LinkedIn" link
+- [ ] Scheduled posts auto-publish via Cloud Scheduler
 - [ ] Analytics fetched at defined intervals for published posts
 
 ---
@@ -201,7 +201,7 @@ Before marking any story complete:
 
 #### 1. US-026 — Real Dashboard KPIs
 - Depends on: US-022, US-023
-- Replace all mock KPI values with Supabase queries against post_analytics
+- Replace all mock KPI values with Firestore queries against postAnalytics
 - Add trend calculations vs previous 30d
 
 #### 2. US-027 — Top Post Card
@@ -223,7 +223,7 @@ Before marking any story complete:
 
 #### 5. US-030 — LinkedIn Post Import
 - Depends on: US-014, US-023
-- Create `linkedin-import-posts` Edge Function
+- Create `importPosts` Cloud Function
 - Add "Import LinkedIn posts" button to Settings
 - Build progress indicator and result summary
 
@@ -241,16 +241,16 @@ Before marking any story complete:
 
 ### Story Execution Order
 
-#### 1. US-031 — engagements Table
-- Create DB migration
+#### 1. US-031 — engagements Subcollection
+- Define `users/{uid}/engagements/{id}` document shape and security rules
 
-#### 2. US-034 — inspirations Table + Storage Bucket
-- Create DB migration and storage bucket
+#### 2. US-034 — inspirations Subcollection + Storage Path
+- Define `users/{uid}/inspirations/{id}` document shape and the `inspirations/{uid}/` Storage path
 - No dependency on US-031
 
-#### 3. US-032 — generate-comment-options Edge Function
+#### 3. US-032 — generateCommentOptions Cloud Function
 - Depends on: US-031
-- Create Edge Function with persona-aware Gemini prompting
+- Create Cloud Function with persona-aware Gemini prompting
 - Test with real persona data — verify 3 options returned with correct approaches
 
 #### 4. US-033 — Comment Drafting Page (/engage)
@@ -263,7 +263,7 @@ Before marking any story complete:
 
 #### 6. US-036 — Reference Inspirations in Content Generation
 - Depends on: US-034, US-035
-- Modify generate-content Edge Function to include inspirations context
+- Modify the generateContent Cloud Function to include inspirations context
 - Add toggle in content generator UI
 
 #### 7. US-037 — Feed Insights Tab
@@ -296,8 +296,8 @@ Before marking any story complete:
 
 #### 2. US-039 — Session Sharing
 - Depends on: US-038
-- Modify web app login/logout to write/clear chrome.storage.local 'lb_session'
-- Extension popup reads and validates JWT
+- Modify web app login/logout to write/clear chrome.storage.local 'lb_firebase_token'
+- Extension popup reads and validates the cached token expiry
 
 #### 3. US-040 — Popup UI
 - Depends on: US-039
@@ -317,7 +317,7 @@ Before marking any story complete:
 #### 6. US-043 — Post Scoring
 - Depends on: US-042, US-039
 - Build scorer.ts with local scoring logic
-- Cache persona pillars from Supabase to chrome.storage.local
+- Cache persona pillars from Firestore to chrome.storage.local
 
 #### 7. US-044 — Badge Injection
 - Depends on: US-043
@@ -327,7 +327,7 @@ Before marking any story complete:
 #### 8. US-045 — Comment Overlay
 - Depends on: US-044, US-032, US-039
 - Build overlay panel with comment cards
-- Wire to generate-comment-options Edge Function
+- Wire to the generateCommentOptions Cloud Function
 
 #### 9. US-046 — Comment Injection into LinkedIn
 - Depends on: US-045
@@ -337,7 +337,7 @@ Before marking any story complete:
 #### 10. US-047 — Quick Draft Capture
 - Depends on: US-044, US-039
 - Build context menu on badge
-- Create generate-draft-from-capture Edge Function
+- Create generateDraftFromCapture Cloud Function
 - Wire chrome.notifications
 
 #### 11. US-048 — Transparency Dashboard in Popup
@@ -365,7 +365,7 @@ Before marking any story complete:
 ### Story Execution Order
 
 #### 1. US-049 — Taste Intake Enrichment
-- Depends on: US-034 (inspirations table)
+- Depends on: US-034 (inspirations subcollection)
 - Build "Refine My Taste" section in Settings → Persona
 
 #### 2. US-050 — 30-Day Persona Refresh Flow
@@ -384,9 +384,9 @@ Before marking any story complete:
 #### 4. US-052 — Email Notifications
 - Depends on: US-011, US-020, US-026
 - Integrate Resend API
-- Build send-notification-email Edge Function
+- Build sendEmail Cloud Function
 - Set up scheduled post reminder trigger
-- Set up weekly digest trigger (Monday 8am)
+- Set up weekly digest trigger (Monday 8am) via Cloud Scheduler
 
 #### 5. US-053 — Content Templates Library
 - No dependencies — can build in parallel
@@ -416,7 +416,7 @@ When starting a new sprint session with Claude Code, use this prompt template:
 
 ```
 Read the /project-documents folder in this repo, specifically:
-- TRD.md for architecture and DB schema
+- TRD.md for architecture and Firestore data model
 - BACKLOG.md for user stories and acceptance criteria
 - SPRINTS.md for the sprint execution order
 
@@ -437,16 +437,16 @@ Please:
 
 ## Known Technical Context for Claude Code
 
-### Existing Architecture (from codebase scan)
-- **Frontend:** React + TypeScript + Vite + Tailwind + shadcn-ui, built via Lovable
-- **Backend:** Supabase — PostgreSQL, Auth, Edge Functions (Deno), Storage, Realtime
-- **AI Model:** Gemini 2.5 Pro (existing Edge Functions already use this)
-- **Existing Edge Functions:** generate-persona, generate-content, chat-agent
-- **Existing DB Tables:** profiles, posts, personas, chat_messages
-- **Existing Storage Bucket:** admired-posts
+### Existing Architecture (post-migration, see TRD.md v2.0)
+- **Frontend:** React + TypeScript + Vite + Tailwind + shadcn-ui, originally scaffolded via Lovable
+- **Backend:** Firebase — Firestore, Auth, Cloud Functions (Node.js 20, 2nd gen), Storage, Cloud Scheduler
+- **AI Model:** Gemini 2.5 Pro, via the Lovable AI Gateway (existing Cloud Functions already use this)
+- **Existing Cloud Functions:** generateContent, personaAgent, prAgentChat
+- **Existing Firestore Collections:** `users/{uid}` (profile), `users/{uid}/persona/main`, `users/{uid}/posts`, `users/{uid}/chatMessages`
+- **Existing Storage Paths:** `admiredPosts/{uid}/`
 
 ### What Already Works (Do Not Break)
-- Supabase auth with email/password
+- Firebase Auth with email/password + Google OAuth
 - 3-step onboarding flow → persona generation
 - Content generator (topic/tone/length/instructions → Gemini → draft)
 - Regeneration with feedback
@@ -458,4 +458,4 @@ Please:
 ### Critical: Do Not Overwrite
 - LinkedInConnect.tsx and linkedinService.ts exist as stubs — extend them, do not delete
 - LinkedInAnalytics.tsx exists as stub — extend it
-- The admired-posts storage bucket contains user data — do not delete or modify its policies
+- The `admiredPosts/{uid}/` Storage path contains user data — do not delete or modify its security rules

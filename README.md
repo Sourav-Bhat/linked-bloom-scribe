@@ -1,73 +1,72 @@
-# Welcome to your Lovable project
+# LinkedBloom Scribe
 
-## Project info
+An AI-powered personal branding platform that helps professionals build and manage their thought-leadership presence on LinkedIn — persona modeling, AI-assisted content generation, and an AI "PR agent" chat, backed by Firebase.
 
-**URL**: https://lovable.dev/projects/99b9ea1b-e48a-4737-b204-8116ce2d964b
+Full product/technical documentation lives in [project_plan/](project_plan/) (BRD, PRD, TRD, BACKLOG, SPRINTS).
 
-## How can I edit this code?
+## Tech Stack
 
-There are several ways of editing your application.
+- **Frontend:** Vite, React, TypeScript, shadcn-ui, Tailwind CSS
+- **Backend:** Firebase (Auth, Firestore, Storage, Cloud Functions)
+- **AI:** Google Gemini, via Cloud Functions (`generateContent`, `personaAgent`, `prAgentChat`)
+- **Deployment:** Docker (nginx-served static build) or Firebase Hosting
 
-**Use Lovable**
+## Local Development
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/99b9ea1b-e48a-4737-b204-8116ce2d964b) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requires Node.js 20+.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm install
+cp .env.example .env   # fill in your Firebase project config
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app expects a Firebase project with Auth, Firestore, and Storage enabled. See `.env.example` for the required `VITE_FIREBASE_*` variables and the Cloud Functions base URL.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Cloud Functions
 
-**Use GitHub Codespaces**
+Functions live in [functions/](functions/) and are deployed separately:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+cd functions
+npm install
+npm run build
+npm run deploy        # firebase deploy --only functions
+# or, for local testing:
+npm run serve          # firebase emulators:start --only functions
+```
 
-## What technologies are used for this project?
+### Other scripts
 
-This project is built with:
+```sh
+npm run build       # production build
+npm run build:dev   # development-mode build
+npm run lint         # eslint
+npm run preview      # preview a production build locally
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Running with Docker
 
-## How can I deploy this project?
+A Dockerfile builds the Vite app and serves it via nginx on port 3000:
 
-Simply open [Lovable](https://lovable.dev/projects/99b9ea1b-e48a-4737-b204-8116ce2d964b) and click on Share -> Publish.
+```sh
+docker compose up --build
+```
 
-## Can I connect a custom domain to my Lovable project?
+Then open http://localhost:3000.
 
-Yes, you can!
+## Project Structure
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```
+src/
+  components/ui/   shadcn-ui components
+  features/        feature modules (auth, dashboard, generator, calendar, linkedin, onboarding, profile, review)
+  lib/firebase.ts   Firebase client init (auth, firestore, storage)
+  hooks/
+functions/
+  src/ai/           Gemini-backed Cloud Functions
+  src/middleware/   auth token verification
+project_plan/        product & technical requirements, backlog, sprint plan
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Firestore security rules, indexes, and Storage rules are defined in `firestore.rules`, `firestore.indexes.json`, and `storage.rules`.
