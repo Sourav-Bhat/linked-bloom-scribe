@@ -2,5 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "3000:80"
+      # Host port is configurable (default 3000). Override with APP_PORT, e.g.
+      # APP_PORT=3100 docker compose up --build
+      - "${APP_PORT:-3000}:80"
     restart: unless-stopped
