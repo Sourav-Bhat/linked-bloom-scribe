@@ -87,10 +87,8 @@ const ContentForm: React.FC<ContentFormProps> = ({
                 </SelectTrigger>
                 <SelectContent className="z-50">
                   <SelectItem value="professional">Professional</SelectItem>
-                  <SelectItem value="friendly">Friendly</SelectItem>
-                  <SelectItem value="authoritative">Authoritative</SelectItem>
-                  <SelectItem value="educational">Educational</SelectItem>
-                  <SelectItem value="inspirational">Inspirational</SelectItem>
+                  <SelectItem value="conversational">Conversational</SelectItem>
+                  <SelectItem value="storytelling">Storytelling</SelectItem>
                 </SelectContent>
               </Select>
             </div>

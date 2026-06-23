@@ -6,7 +6,7 @@ export interface ContentPost {
   title: string;
   content: string;
   hashtags?: string;
-  status: 'draft' | 'scheduled' | 'published' | 'final';
+  status: 'draft' | 'scheduled' | 'published';
   topic?: string;
   tone?: string;
   instructions?: string;
@@ -25,7 +25,7 @@ export interface UserProfile {
   jobTitle?: string;
   topics?: string[];
   postsPerWeek?: number;
-  tone?: 'professional' | 'friendly' | 'authoritative' | 'educational' | 'inspirational';
+  tone?: 'professional' | 'conversational' | 'storytelling';
   createdAt?: string;
   updatedAt?: string;
   company?: string;

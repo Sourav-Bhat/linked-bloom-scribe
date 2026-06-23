@@ -49,3 +49,25 @@ export const updateContent = async (
     updatedAt: new Date().toISOString(),
   });
 };
+
+/** Move a post into the `scheduled` state with a concrete publish date/time. */
+export const scheduleContent = async (
+  userId: string,
+  postId: string,
+  scheduledDate: string,
+) => {
+  await updateDoc(doc(db, 'users', userId, 'posts', postId), {
+    status: 'scheduled',
+    scheduledDate,
+    updatedAt: new Date().toISOString(),
+  });
+};
+
+/** Move a scheduled post back to draft, clearing its scheduled date. */
+export const unscheduleContent = async (userId: string, postId: string) => {
+  await updateDoc(doc(db, 'users', userId, 'posts', postId), {
+    status: 'draft',
+    scheduledDate: '',
+    updatedAt: new Date().toISOString(),
+  });
+};

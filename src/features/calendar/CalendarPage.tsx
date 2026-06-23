@@ -1,163 +1,111 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Calendar as CalendarIcon, Clock, Edit, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Edit, Undo2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ContentPost } from '@/lib/types';
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useNavigate } from "react-router-dom";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-// Mock scheduled content data
-const initialScheduledContent = [
-  { 
-    id: '1', 
-    title: '10 Tips for LinkedIn Networking', 
-    date: new Date(2025, 3, 23, 9, 0), 
-    status: 'draft' 
-  },
-  { 
-    id: '2', 
-    title: 'How to Optimize Your LinkedIn Profile', 
-    date: new Date(2025, 3, 28, 14, 30), 
-    status: 'draft' 
-  },
-];
+import useAuth from "@/features/auth/useAuth";
+import { getUserContents, unscheduleContent } from "@/features/generator/contentService";
 
 const Calendar = () => {
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<ContentPost[]>([]);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [view, setView] = useState<"month" | "week" | "day">("month");
-  const [scheduledContent, setScheduledContent] = useState(initialScheduledContent);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [postToDelete, setPostToDelete] = useState<string | null>(null);
-  
-  // Filter posts for the selected date
-  const postsForSelectedDate = scheduledContent.filter(post => {
-    if (!selectedDate) return false;
-    
-    return post.date.getDate() === selectedDate.getDate() && 
-           post.date.getMonth() === selectedDate.getMonth() && 
-           post.date.getFullYear() === selectedDate.getFullYear();
-  });
-  
-  // Show days with posts
-  const daysWithPosts = scheduledContent.map(post => 
-    new Date(post.date.getFullYear(), post.date.getMonth(), post.date.getDate())
+  const [unscheduleId, setUnscheduleId] = useState<string | null>(null);
+
+  const loadPosts = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const all = await getUserContents(user.uid);
+      setPosts(all as ContentPost[]);
+    } catch (error) {
+      console.error('Error loading calendar:', error);
+      toast({ title: "Error", description: "Failed to load your calendar.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadPosts(); }, [user]);
+
+  // Only scheduled posts with a real date appear on the calendar.
+  const scheduled = useMemo(
+    () => posts
+      .filter((p) => p.status === 'scheduled' && p.scheduledDate)
+      .map((p) => ({ ...p, when: new Date(p.scheduledDate as string) }))
+      .filter((p) => !isNaN(p.when.getTime())),
+    [posts]
   );
+
+  const daysWithPosts = useMemo(
+    () => scheduled.map((p) => new Date(p.when.getFullYear(), p.when.getMonth(), p.when.getDate())),
+    [scheduled]
+  );
+
+  const postsForSelectedDate = useMemo(
+    () => scheduled.filter((p) =>
+      selectedDate &&
+      p.when.getDate() === selectedDate.getDate() &&
+      p.when.getMonth() === selectedDate.getMonth() &&
+      p.when.getFullYear() === selectedDate.getFullYear()
+    ),
+    [scheduled, selectedDate]
+  );
+
+  // Upcoming = scheduled in the next 30 days, future only, sorted.
+  const upcoming = useMemo(() => {
+    const now = new Date();
+    const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    return scheduled
+      .filter((p) => p.when >= now && p.when <= horizon)
+      .sort((a, b) => a.when.getTime() - b.when.getTime());
+  }, [scheduled]);
 
   const handleDateSelect = (newDate: Date | undefined) => {
     setDate(newDate);
     setSelectedDate(newDate);
   };
 
-  const handleEdit = (postId: string) => {
-    // Navigate to the post editor page with the post ID
-    navigate(`/review/${postId}`);
-  };
-
-  const confirmDelete = (postId: string) => {
-    setPostToDelete(postId);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDelete = async () => {
-    if (!postToDelete) return;
-    
+  const handleUnschedule = async () => {
+    if (!unscheduleId || !user) return;
     try {
-      setScheduledContent(scheduledContent.filter(post => post.id !== postToDelete));
-      
-      toast({
-        title: "Post deleted",
-        description: "The post has been permanently deleted.",
-      });
+      await unscheduleContent(user.uid, unscheduleId);
+      toast({ title: "Moved to drafts", description: "The post was removed from the calendar." });
+      await loadPosts();
     } catch (error) {
-      console.error('Error deleting post:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete the post. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Error unscheduling post:', error);
+      toast({ title: "Error", description: "Failed to update the post.", variant: "destructive" });
     } finally {
-      setDeleteDialogOpen(false);
-      setPostToDelete(null);
+      setUnscheduleId(null);
     }
   };
 
-  const handleStatusChange = (postId: string, newStatus: 'draft' | 'scheduled') => {
-    // Update the status in the local state
-    setScheduledContent(content => 
-      content.map(post => 
-        post.id === postId 
-          ? { 
-              ...post, 
-              status: newStatus,
-              // If setting to scheduled and it's not already scheduled, set the date
-              date: newStatus === 'scheduled' && post.status !== 'scheduled' 
-                ? new Date(Date.now() + 24 * 60 * 60 * 1000) // Default to tomorrow
-                : post.date
-            } 
-          : post
-      )
-    );
-
-    toast({
-      title: `Post ${newStatus}`,
-      description: `The post has been ${newStatus === 'scheduled' ? 'scheduled for publication' : 'moved to drafts'}.`,
-    });
-  };
+  if (loading) {
+    return <div className="flex items-center justify-center h-64">Loading your calendar…</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Content Calendar</h1>
-        <Select value={view} onValueChange={(value: "month" | "week" | "day") => setView(value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select view" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="month">Month View</SelectItem>
-            <SelectItem value="week">Week View</SelectItem>
-            <SelectItem value="day">Day View</SelectItem>
-          </SelectContent>
-        </Select>
+        <Button asChild>
+          <Link to="/generator">Create New Post</Link>
+        </Button>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -167,9 +115,7 @@ const Calendar = () => {
               <CalendarIcon className="mr-2 h-5 w-5" />
               Publishing Schedule
             </CardTitle>
-            <CardDescription>
-              View and manage your scheduled LinkedIn content
-            </CardDescription>
+            <CardDescription>View and manage your scheduled LinkedIn content</CardDescription>
           </CardHeader>
           <CardContent>
             <CalendarComponent
@@ -177,14 +123,9 @@ const Calendar = () => {
               selected={date}
               onSelect={handleDateSelect}
               className="border rounded-md p-3"
-              modifiers={{
-                hasPost: daysWithPosts,
-              }}
+              modifiers={{ hasPost: daysWithPosts }}
               modifiersStyles={{
-                hasPost: {
-                  fontWeight: 'bold',
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                }
+                hasPost: { fontWeight: 'bold', backgroundColor: 'rgba(10, 102, 194, 0.12)' },
               }}
             />
           </CardContent>
@@ -192,43 +133,49 @@ const Calendar = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>{selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Selected Date'}</CardTitle>
+            <CardTitle>
+              {selectedDate
+                ? selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                : 'Selected Date'}
+            </CardTitle>
             <CardDescription>
-              {postsForSelectedDate.length 
-                ? `${postsForSelectedDate.length} post(s) scheduled` 
+              {postsForSelectedDate.length
+                ? `${postsForSelectedDate.length} post(s) scheduled`
                 : 'No posts scheduled for this date'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {postsForSelectedDate.length > 0 ? (
               <div className="space-y-4">
-                {postsForSelectedDate.map(post => (
-                  <div key={post.id} className="p-3 border rounded-md bg-white">
+                {postsForSelectedDate.map((post) => (
+                  <div key={post.id} className="p-3 border rounded-md">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-medium">{post.title}</h3>
-                        <div className="flex items-center text-sm text-gray-500 mt-1">
+                        <h3 className="font-medium line-clamp-1">{post.title || post.topic}</h3>
+                        <div className="flex items-center text-sm text-muted-foreground mt-1">
                           <Clock className="h-3 w-3 mr-1" />
-                          {post.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {post.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
-                      <Badge variant={post.status === 'scheduled' ? 'default' : 'outline'}>
-                        {post.status === 'draft' ? 'Draft' : 'Scheduled'}
-                      </Badge>
+                      <Badge>Scheduled</Badge>
                     </div>
                     <div className="mt-3 flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(post.id)}>
-                        <Edit className="h-3 w-3 mr-1" /> Edit
+                      <Button size="sm" variant="outline" asChild>
+                        <Link to={`/generator?edit=${post.id}`}><Edit className="h-3 w-3 mr-1" /> Edit</Link>
                       </Button>
-                      <Button size="sm" onClick={() => handleEdit(post.id)}>Review</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setUnscheduleId(post.id)}>
+                        <Undo2 className="h-3 w-3 mr-1" /> Unschedule
+                      </Button>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="py-8 text-center">
-                <p className="text-gray-500">No content scheduled for this date</p>
-                <Button className="mt-4">Schedule New Post</Button>
+                <p className="text-muted-foreground">No content scheduled for this date</p>
+                <Button className="mt-4" asChild>
+                  <Link to="/generator">Create a post to schedule</Link>
+                </Button>
               </div>
             )}
           </CardContent>
@@ -241,81 +188,59 @@ const Calendar = () => {
           <CardDescription>All scheduled content for the next 30 days</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Post Title</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scheduledContent.map(post => (
-                  <TableRow key={post.id}>
-                    <TableCell>{post.title}</TableCell>
-                    <TableCell>{post.date.toLocaleDateString()}</TableCell>
-                    <TableCell>{post.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                    <TableCell>
-                      <Badge variant={post.status === 'scheduled' ? 'default' : 'outline'}>
-                        {post.status === 'draft' ? 'Draft' : 'Scheduled'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(post.id)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => confirmDelete(post.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost">Status</Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => handleStatusChange(post.id, 'draft')}
-                              disabled={post.status === 'draft'}
-                            >
-                              Set as Draft
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleStatusChange(post.id, 'scheduled')}
-                              disabled={post.status === 'scheduled'}
-                            >
-                              Schedule Post
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
+          {upcoming.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Nothing scheduled yet. Generate a post and schedule it to see it here.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Post Title</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {upcoming.map((post) => (
+                    <TableRow key={post.id}>
+                      <TableCell className="max-w-[220px] truncate">{post.title || post.topic}</TableCell>
+                      <TableCell>{post.when.toLocaleDateString()}</TableCell>
+                      <TableCell>{post.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                      <TableCell><Badge>Scheduled</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link to={`/generator?edit=${post.id}`}><Edit className="h-4 w-4" /></Link>
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setUnscheduleId(post.id)}>
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={Boolean(unscheduleId)} onOpenChange={(open) => { if (!open) setUnscheduleId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Remove from calendar?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the selected post.
+              This moves the post back to your drafts. You can reschedule it anytime.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleUnschedule}>Move to drafts</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

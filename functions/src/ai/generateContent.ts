@@ -16,27 +16,44 @@ const handler = async (req: Request, res: Response): Promise<void> => {
   const uid: string = (req as any).uid;
   const { topic, tone, instructions, includeHashtags, postLength, regeneratePrompt, previousContent, model } = req.body;
 
-  // Load persona context
+  // Load persona context (rich persona lives under `personaData`)
   let personaContext = '';
   try {
     const snap = await admin.firestore().doc(`users/${uid}/persona/main`).get();
     if (snap.exists) {
       const d = snap.data()!;
-      personaContext = `User persona: industry=${d.industry}, tone=${d.tone}, topics=${(d.topics || []).join(', ')}.`;
+      const p = d.personaData || {};
+      const parts: string[] = [];
+      if (p.archetype?.name) parts.push(`The author's brand archetype is "${p.archetype.name}" — ${p.archetype.tagline || ''}.`);
+      if (Array.isArray(p.contentPillars) && p.contentPillars.length) {
+        parts.push(`Their content pillars are: ${p.contentPillars.map((c: any) => c.title).filter(Boolean).join('; ')}.`);
+      }
+      if (p.voiceProfile?.tone) parts.push(`Their voice/tone: ${p.voiceProfile.tone}.`);
+      if (p.voiceProfile?.signatureStyle) parts.push(`Their signature style: ${p.voiceProfile.signatureStyle}.`);
+      if (p.voiceProfile?.thingsToAvoid) parts.push(`STRICTLY AVOID: ${p.voiceProfile.thingsToAvoid}.`);
+      // Fallbacks for older/simpler profiles
+      if (!parts.length && (d.industry || d.tone || d.topics)) {
+        parts.push(`User persona: industry=${d.industry}, tone=${d.tone}, topics=${(d.topics || []).join(', ')}.`);
+      }
+      if (parts.length) personaContext = `Write in the author's established voice. ${parts.join(' ')}`;
     }
   } catch { /* persona optional */ }
 
-  const lengthGuide = postLength === 'short' ? '150-300 words' : postLength === 'long' ? '600-900 words' : '300-500 words';
+  // Word bands MUST match the UI labels (Short 50-100 / Medium 100-200 / Long 200-300).
+  const lengthGuide = postLength === 'short' ? '50-100 words'
+    : postLength === 'long' ? '200-300 words'
+    : '100-200 words';
 
   const systemPrompt = [
-    'You are an expert LinkedIn content creator.',
+    'You are an expert LinkedIn ghostwriter.',
     personaContext,
     `Write a ${tone} LinkedIn post about: ${topic}.`,
-    `Target length: ${lengthGuide}.`,
+    `STRICT LENGTH: the post body must be ${lengthGuide}. Do not exceed the upper bound — count words and trim if needed.`,
+    'FORMAT: write plain text ready to paste directly into LinkedIn. Do NOT use markdown — no **, no ##, no backticks, no markdown bullets. Use short paragraphs and line breaks for readability; if you list items use "•".',
     instructions ? `Additional instructions: ${instructions}.` : '',
-    includeHashtags ? 'End with 3-5 relevant hashtags.' : 'Do not include hashtags.',
+    includeHashtags ? 'After the body, add 3-5 relevant hashtags in the hashtags field only.' : 'Do not include hashtags.',
     previousContent ? `Previous version to improve:\n${previousContent}\nImprovement request: ${regeneratePrompt || 'improve it'}` : '',
-    'Return valid JSON: { "title": "...", "content": "...", "hashtags": "..." }',
+    'Return ONLY valid JSON: { "title": "...", "content": "...", "hashtags": "..." }. The content field is the post body without the title or hashtags.',
   ].filter(Boolean).join(' ');
 
   let text: string;

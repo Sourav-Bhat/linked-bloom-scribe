@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import {
   collection, getDocs, deleteDoc, addDoc, query, orderBy,
 } from 'firebase/firestore';
+import { useNavigate } from "react-router-dom";
 import { db } from '@/lib/firebase';
 import { getIdToken } from '@/features/auth/authService';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Send, Trash2 } from "lucide-react";
+import { Send, Trash2, PenLine } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import ReactMarkdown from "react-markdown";
 
@@ -15,13 +16,45 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_CLOUD_FUNCTIONS_BASE_URL}/prAgentChat`;
 
+// Number of prior turns sent to the model for continuity.
+const HISTORY_TURNS = 20;
+
+const MODES: Array<{ id: string; label: string; blurb: string; prompts: string[] }> = [
+  {
+    id: "discovery",
+    label: "Discovery",
+    blurb: "Let's go deeper on who you are and what you stand for.",
+    prompts: ["Help me sharpen my positioning", "What makes my POV different?", "Interview me about my expertise"],
+  },
+  {
+    id: "brainstorm",
+    label: "Brainstorm",
+    blurb: "Let's find sharp angles worth posting this week.",
+    prompts: ["Give me 3 post angles", "What's a contrarian take I could share?", "Turn my week into a post idea"],
+  },
+  {
+    id: "strategy",
+    label: "Strategy",
+    blurb: "Let's review whether your content is on-brand and working.",
+    prompts: ["Review my content strategy", "Am I drifting off-brand?", "What should I double down on?"],
+  },
+  {
+    id: "accountability",
+    label: "Accountability",
+    blurb: "Let's make sure you actually ship.",
+    prompts: ["Keep me accountable this week", "I keep not posting — help", "What's my one next action?"],
+  },
+];
+
 interface PrAgentChatProps {
   userId: string;
 }
 
 const PrAgentChat = ({ userId }: PrAgentChatProps) => {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
+  const [mode, setMode] = useState<string>("discovery");
   const [isLoading, setIsLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -58,11 +91,14 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
     toast({ title: "Conversation cleared" });
   };
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
 
     const userMsg: Msg = { role: "user", content: text };
+    // Build the running history we send to the model (prior turns + this one).
+    const history = [...messages, userMsg].slice(-HISTORY_TURNS);
+
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
@@ -91,7 +127,7 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ messages: [userMsg] }),
+        body: JSON.stringify({ messages: history, mode }),
       });
 
       if (!resp.ok) {
@@ -164,6 +200,12 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
     }
   };
 
+  const turnIntoPost = (seed: string) => {
+    navigate(`/generator?instructions=${encodeURIComponent(seed.slice(0, 600))}`);
+  };
+
+  const activeMode = MODES.find((m) => m.id === mode) || MODES[0];
+
   if (!historyLoaded) {
     return (
       <Card>
@@ -179,31 +221,44 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Your PR Agent</h3>
-          <p className="text-xs text-muted-foreground">Personal brand strategist · Always learning about you</p>
+          <p className="text-xs text-muted-foreground">Personal brand strategist · Remembers your conversations</p>
         </div>
         {messages.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearHistory} className="text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={clearHistory} aria-label="Clear conversation" className="text-muted-foreground">
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
+      </div>
+
+      {/* Session mode selector */}
+      <div className="flex gap-1 px-3 py-2 border-b overflow-x-auto">
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setMode(m.id)}
+            aria-pressed={mode === m.id}
+            className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+              mode === m.id
+                ? "bg-primary text-primary-foreground"
+                : "border border-input text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2 max-w-sm">
-              <p className="text-sm text-muted-foreground">
-                Start a conversation with your PR agent. They know your persona and will help you strategise your LinkedIn presence.
-              </p>
+              <p className="text-sm font-medium text-foreground">{activeMode.label} session</p>
+              <p className="text-sm text-muted-foreground">{activeMode.blurb}</p>
               <div className="flex flex-wrap gap-2 justify-center pt-2">
-                {[
-                  "What should I post this week?",
-                  "How can I grow my audience?",
-                  "Review my content strategy",
-                ].map((suggestion) => (
+                {activeMode.prompts.map((suggestion) => (
                   <button
                     key={suggestion}
-                    onClick={() => setInput(suggestion)}
+                    onClick={() => send(suggestion)}
                     className="text-xs px-3 py-1.5 rounded-full border border-input text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
                   >
                     {suggestion}
@@ -216,19 +271,29 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
 
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
-                msg.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground"
-              }`}
-            >
-              {msg.role === "assistant" ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
-                </div>
-              ) : (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+            <div className={`max-w-[80%] ${msg.role === "user" ? "" : "space-y-1"}`}>
+              <div
+                className={`rounded-lg px-4 py-3 text-sm ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground"
+                }`}
+              >
+                {msg.role === "assistant" ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                )}
+              </div>
+              {msg.role === "assistant" && msg.content && (
+                <button
+                  onClick={() => turnIntoPost(msg.content)}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <PenLine className="h-3 w-3" /> Turn into a post
+                </button>
               )}
             </div>
           </div>
@@ -260,9 +325,10 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
             rows={1}
           />
           <Button
-            onClick={send}
+            onClick={() => send()}
             disabled={!input.trim() || isLoading}
             size="icon"
+            aria-label="Send message"
             className="shrink-0 h-[44px] w-[44px]"
           >
             <Send className="h-4 w-4" />

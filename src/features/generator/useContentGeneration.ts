@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { getIdToken } from "@/features/auth/authService";
@@ -17,6 +17,8 @@ const useContentGeneration = (userId: string | undefined) => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const editPostId = searchParams.get('edit');
+  const seedTopic = searchParams.get('topic');
+  const seedInstructions = searchParams.get('instructions');
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,24 +79,36 @@ const useContentGeneration = (userId: string | undefined) => {
     loadEditContent();
   }, [userId, editPostId, toast]);
 
+  // Prefill from a PR Agent handoff (?topic= / ?instructions=) when not editing.
   useEffect(() => {
-    async function loadDrafts() {
-      if (userId) {
-        try {
-          const userDrafts = await getUserContents(userId);
-          setDrafts(userDrafts as ContentPost[]);
-        } catch (error) {
-          console.error("Error loading drafts:", error);
-          toast({
-            title: "Error",
-            description: "Failed to load drafts. Please try again.",
-            variant: "destructive",
-          });
-        }
-      }
+    if (!editPostId && (seedTopic || seedInstructions)) {
+      setFormData((prev) => ({
+        ...prev,
+        topic: seedTopic || prev.topic,
+        instructions: seedInstructions || prev.instructions,
+      }));
     }
-    loadDrafts();
+  }, [editPostId, seedTopic, seedInstructions]);
+
+  const reloadDrafts = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const all = await getUserContents(userId);
+      // Drafts panel shows only true drafts; scheduled/published live on the calendar.
+      setDrafts((all as ContentPost[]).filter((p) => p.status === "draft"));
+    } catch (error) {
+      console.error("Error loading drafts:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load drafts. Please try again.",
+        variant: "destructive",
+      });
+    }
   }, [userId, toast]);
+
+  useEffect(() => {
+    reloadDrafts();
+  }, [reloadDrafts]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -274,8 +288,7 @@ const useContentGeneration = (userId: string | undefined) => {
         postLength: "medium",
       });
 
-      const updatedDrafts = await getUserContents(userId);
-      setDrafts(updatedDrafts as ContentPost[]);
+      await reloadDrafts();
     } catch (error) {
       console.error("Error saving content:", error);
       toast({
@@ -317,7 +330,8 @@ const useContentGeneration = (userId: string | undefined) => {
     handleSubmit,
     handleRegenerateContent,
     handleSaveContent,
-    toggleEditMode
+    toggleEditMode,
+    reloadDrafts
   };
 };
 

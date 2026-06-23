@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import useAuth from "@/features/auth/useAuth";
-import { updateContentStatus } from "@/features/generator/contentService";
+import { scheduleContent } from "@/features/generator/contentService";
 import { useToast } from "@/hooks/use-toast";
 import ContentForm from "@/features/generator/ContentForm";
 import ContentPreview from "@/features/generator/ContentPreview";
@@ -43,26 +43,25 @@ const Generator = () => {
     handleSubmit,
     handleRegenerateContent,
     handleSaveContent,
-    toggleEditMode
+    toggleEditMode,
+    reloadDrafts
   } = useContentGeneration(user?.uid);
 
-  const handleFinalizeDraft = async (id: string) => {
+  const handleScheduleDraft = async (id: string, isoDate: string) => {
     if (!user) return;
 
     try {
-      await updateContentStatus(user.uid, id, "final");
-      toast({ 
-        title: "Draft Finalized", 
-        description: "The draft is now marked as final." 
+      await scheduleContent(user.uid, id, isoDate);
+      toast({
+        title: "Post scheduled",
+        description: `Added to your calendar for ${new Date(isoDate).toLocaleString()}.`,
       });
-      
-      // Reload drafts after status update
-      // This will be handled by the useEffect in useContentGeneration
+      await reloadDrafts();
     } catch (error) {
-      console.error("Error finalizing draft:", error);
+      console.error("Error scheduling draft:", error);
       toast({
         title: "Error",
-        description: "Failed to finalize draft. Please try again.",
+        description: "Failed to schedule the post. Please try again.",
         variant: "destructive",
       });
     }
@@ -113,9 +112,9 @@ const Generator = () => {
               editMode={editMode}
             />
           ) : (
-            <DraftsList 
+            <DraftsList
               drafts={drafts}
-              handleFinalizeDraft={handleFinalizeDraft}
+              handleScheduleDraft={handleScheduleDraft}
             />
           )}
         </div>

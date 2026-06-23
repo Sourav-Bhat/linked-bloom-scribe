@@ -49,16 +49,27 @@ const Dashboard = () => {
     return <div className="flex items-center justify-center h-64">Loading dashboard data...</div>;
   }
 
-  // Calculate metrics
+  // Calculate metrics — single source of truth derived from post states.
   const totalPosts = posts.length;
   const draftPosts = posts.filter(post => post.status === "draft");
   const publishedPosts = posts.filter(post => post.status === "published");
-  const scheduledPosts = posts.filter(post => post.status === "scheduled");
-  
-  // Find the next scheduled post
-  const nextPost = scheduledPosts.sort((a, b) => {
-    return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
-  })[0];
+  const scheduledPosts = posts.filter(post => post.status === "scheduled" && post.scheduledDate);
+
+  // Scheduled posts in the current calendar month.
+  const now = new Date();
+  const thisMonthPosts = scheduledPosts.filter(post => {
+    const d = new Date(post.scheduledDate as string);
+    return !isNaN(d.getTime()) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+
+  // Upcoming scheduled posts (future), sorted — same logic as the calendar.
+  const upcomingPosts = scheduledPosts
+    .map(p => ({ ...p, when: new Date(p.scheduledDate as string) }))
+    .filter(p => !isNaN(p.when.getTime()) && p.when >= now)
+    .sort((a, b) => a.when.getTime() - b.when.getTime());
+
+  // Next scheduled post.
+  const nextPost = upcomingPosts[0];
 
   return (
     <div className="space-y-6">
@@ -92,10 +103,12 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {nextPost ? new Date(nextPost.scheduledDate).toLocaleDateString() : "No scheduled posts"}
+              {nextPost ? nextPost.when.toLocaleDateString() : "No scheduled posts"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {nextPost ? `${new Date(nextPost.scheduledDate).toLocaleTimeString()} · ${nextPost.title}` : "Create your first post"}
+              {nextPost
+                ? `${nextPost.when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${nextPost.title || nextPost.topic}`
+                : "Create your first post"}
             </p>
           </CardContent>
         </Card>
@@ -106,9 +119,9 @@ const Dashboard = () => {
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{scheduledPosts.length || 0}</div>
+            <div className="text-3xl font-bold">{thisMonthPosts.length || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {scheduledPosts.length || 0} posts scheduled
+              {scheduledPosts.length || 0} scheduled total
             </p>
           </CardContent>
         </Card>
@@ -128,28 +141,21 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {posts.length > 0 ? (
-                posts.map((post) => (
+              {upcomingPosts.length > 0 ? (
+                upcomingPosts.map((post) => (
                   <tr key={post.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {post.title}
+                      {post.title || post.topic}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        post.status === "draft" ? "bg-yellow-100 text-yellow-800" : 
-                        post.status === "scheduled" ? "bg-blue-100 text-blue-800" :
-                        "bg-green-100 text-green-800"
-                      }`}>
-                        {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        Scheduled
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {post.scheduledDate ? new Date(post.scheduledDate).toLocaleString() : "Not scheduled"}
+                      {post.when.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/review/${post.id}`}>Review</Link>
-                      </Button>
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/generator?edit=${post.id}`}>
                           <Edit className="h-4 w-4 mr-1" />
@@ -161,8 +167,10 @@ const Dashboard = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                    No posts found. Create your first post!
+                  <td colSpan={4} className="px-10 py-10 text-center text-sm text-muted-foreground">
+                    {totalPosts === 0
+                      ? 'No posts yet — click "Create New Post" to get started.'
+                      : 'No scheduled posts. Schedule a draft to see it here.'}
                   </td>
                 </tr>
               )}
@@ -170,15 +178,6 @@ const Dashboard = () => {
           </table>
         </div>
       </div>
-      
-      {/* Empty state */}
-      {posts.length === 0 && (
-        <Card className="mt-8">
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">No posts yet. Click "Create New Post" to get started.</p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
