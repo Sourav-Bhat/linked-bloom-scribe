@@ -1,4 +1,14 @@
 import { GoogleGenAI } from '@google/genai';
+import { startGeneration, flushLangfuse } from './langfuse';
+
+// Optional per-call observability context (caller identity + tags/metadata for
+// Langfuse). Tracing is a no-op when Langfuse isn't configured.
+export interface TraceContext {
+  name: string;
+  userId?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
 
 // Vertex AI is a real cloud API (can't be emulated). When running under the
 // local Functions emulator the ambient project is the demo/emulator project,
@@ -34,28 +44,78 @@ export const generateText = async (
   systemPrompt: string,
   userMessage: string,
   model?: string,
+  ctx?: TraceContext,
 ): Promise<string> => {
-  const result = await ai.models.generateContent({
-    model: resolveModel(model),
-    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-    config: { systemInstruction: systemPrompt },
+  const resolved = resolveModel(model);
+  const gen = startGeneration({
+    name: ctx?.name ?? 'generateText',
+    userId: ctx?.userId,
+    model: resolved,
+    input: { systemPrompt, userMessage },
+    tags: ctx?.tags,
+    metadata: ctx?.metadata,
   });
-  return result.text ?? '';
+  try {
+    const result = await ai.models.generateContent({
+      model: resolved,
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      config: { systemInstruction: systemPrompt },
+    });
+    const text = result.text ?? '';
+    gen?.end({ output: text, usage: (result as any).usageMetadata });
+    return text;
+  } catch (err: any) {
+    gen?.end({ output: err?.message ?? String(err), level: 'ERROR', statusMessage: 'gemini error' });
+    throw err;
+  } finally {
+    await flushLangfuse();
+  }
 };
 
 export const streamChat = async (
   systemPrompt: string,
   messages: Array<{ role: string; content: string }>,
   model?: string,
+  ctx?: TraceContext,
 ): Promise<AsyncIterable<{ text?: string }>> => {
+  const resolved = resolveModel(model);
   const contents = messages.map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
   }));
 
-  return ai.models.generateContentStream({
-    model: resolveModel(model),
+  const gen = startGeneration({
+    name: ctx?.name ?? 'streamChat',
+    userId: ctx?.userId,
+    model: resolved,
+    input: messages,
+    tags: [...(ctx?.tags ?? []), 'streaming'],
+    metadata: ctx?.metadata,
+  });
+
+  const stream = await ai.models.generateContentStream({
+    model: resolved,
     contents,
     config: { systemInstruction: systemPrompt },
   });
+
+  // Wrap the stream so we can record the assembled output + token usage once it
+  // finishes, without changing how the caller consumes it.
+  return (async function* () {
+    let assembled = '';
+    let usage: any;
+    try {
+      for await (const chunk of stream) {
+        if (chunk.text) assembled += chunk.text;
+        if ((chunk as any).usageMetadata) usage = (chunk as any).usageMetadata;
+        yield chunk;
+      }
+      gen?.end({ output: assembled, usage });
+    } catch (err: any) {
+      gen?.end({ output: err?.message ?? String(err), level: 'ERROR', statusMessage: 'gemini stream error' });
+      throw err;
+    } finally {
+      await flushLangfuse();
+    }
+  })();
 };

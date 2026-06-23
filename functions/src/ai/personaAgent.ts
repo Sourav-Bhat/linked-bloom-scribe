@@ -44,7 +44,12 @@ Return valid JSON with this exact structure:
 
   let text: string;
   try {
-    text = await generateText(systemPrompt, 'Generate my LinkedIn persona strategy.', model);
+    text = await generateText(systemPrompt, 'Generate my LinkedIn persona strategy.', model, {
+      name: 'personaAgent',
+      userId: uid,
+      tags: ['onboarding'],
+      metadata: { industry: onboardingData?.industry, tone: onboardingData?.tone },
+    });
   } catch (err: any) {
     res.status(502).json({ error: `Gemini error: ${err.message || err}` });
     return;

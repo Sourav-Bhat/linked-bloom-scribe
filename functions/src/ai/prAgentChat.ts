@@ -39,7 +39,12 @@ Reference their persona when relevant.`;
 
   let stream: AsyncIterable<{ text?: string }>;
   try {
-    stream = await streamChat(systemPrompt, messages, model);
+    stream = await streamChat(systemPrompt, messages, model, {
+      name: 'prAgentChat',
+      userId: uid,
+      tags: ['chat'],
+      metadata: { turns: messages?.length ?? 0 },
+    });
   } catch (err: any) {
     res.status(502).json({ error: `Gemini error: ${err.message || err}` });
     return;

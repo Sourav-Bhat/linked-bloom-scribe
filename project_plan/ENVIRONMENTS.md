@@ -31,6 +31,34 @@ the live one, so prod behavior is unchanged.
 
 ---
 
+## Observability (Langfuse)
+
+Every Gemini call is traced to Langfuse from `functions/src/utils/geminiClient.ts`
+(via `utils/langfuse.ts`). Tracing is **optional** — if no keys are present it's a
+silent no-op, so it never blocks a request or a deploy.
+
+Each trace records the input/output, model, token usage, the caller's Firebase
+`userId`, and tags:
+
+```
+linkedbloom · env:<local|production> · fn:<generateContent|personaAgent|prAgentChat> · model:<…> · <feature tags>
+```
+
+`env:` comes from `FUNCTIONS_EMULATOR`, so local and prod traffic are split — and
+dev/prod also use **separate Langfuse projects**:
+
+| | Langfuse project | Keys come from |
+|--|--|--|
+| Dev (local emulator) | dev project | `functions/.env.local` (gitignored) |
+| Prod (deployed) | prod project | GitHub secrets → CI writes `functions/.env` at deploy |
+
+Config vars: `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_BASE_URL`
+(defaults to `https://cloud.langfuse.com`). Prod keys live in the repo Actions
+secrets of the same name; `deploy.yml` writes them into `functions/.env` so the
+deployed functions pick them up as runtime env (no Firebase Secret Manager needed).
+
+---
+
 ## Local dev setup (one-time)
 
 1. **Install prerequisites**

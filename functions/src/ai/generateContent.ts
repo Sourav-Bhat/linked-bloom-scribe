@@ -41,7 +41,12 @@ const handler = async (req: Request, res: Response): Promise<void> => {
 
   let text: string;
   try {
-    text = await generateText(systemPrompt, 'Generate content as instructed.', model);
+    text = await generateText(systemPrompt, 'Generate content as instructed.', model, {
+      name: 'generateContent',
+      userId: uid,
+      tags: tone ? [`tone:${tone}`] : [],
+      metadata: { topic, tone, postLength, regenerate: Boolean(previousContent) },
+    });
   } catch (err: any) {
     res.status(502).json({ error: `Gemini error: ${err.message || err}` });
     return;
