@@ -8,7 +8,7 @@ import { getIdToken } from '@/features/auth/authService';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Send, Trash2, PenLine } from "lucide-react";
+import { Send, Trash2, PenLine, User } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import ReactMarkdown from "react-markdown";
 
@@ -222,38 +222,42 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
   }
 
   return (
-    <div className="flex flex-col h-[600px] border rounded-lg bg-background overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Your PR Agent</h3>
-          <p className="text-xs text-muted-foreground">Personal brand strategist · Remembers your conversations</p>
+    <div className="flex h-[620px] flex-col overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-brand-1">
+      <div className="flex items-center justify-between border-b border-brand-200 bg-brand-25 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="brand-gradient grid h-9 w-9 place-items-center rounded-full text-xs font-bold text-white">PR</div>
+          <div>
+            <h3 className="text-sm font-semibold text-brand-900">Your PR strategist</h3>
+            <p className="text-xs text-brand-500">Always-on · Remembers your conversations</p>
+          </div>
         </div>
         {messages.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearHistory} aria-label="Clear conversation" className="text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={clearHistory} aria-label="Clear conversation" className="text-brand-400">
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
       </div>
 
       {/* Session mode selector */}
-      <div className="flex gap-1 px-3 py-2 border-b overflow-x-auto">
+      <div className="flex gap-2 overflow-x-auto border-b border-brand-200 px-3 py-2.5">
         {MODES.map((m) => (
           <button
             key={m.id}
             onClick={() => setMode(m.id)}
             aria-pressed={mode === m.id}
-            className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
               mode === m.id
-                ? "bg-primary text-primary-foreground"
-                : "border border-input text-muted-foreground hover:text-foreground"
+                ? "bg-ink-900 text-white"
+                : "border border-brand-200 bg-white text-brand-600 hover:text-brand-900"
             }`}
           >
+            {mode === m.id && <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />}
             {m.label}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto bg-brand-25 px-4 py-4">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2 max-w-sm">
@@ -275,13 +279,16 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] ${msg.role === "user" ? "" : "space-y-1"}`}>
+          <div key={i} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+            <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${msg.role === "user" ? "bg-ink-800" : "brand-gradient"}`}>
+              {msg.role === "user" ? <User className="h-4 w-4" /> : "PR"}
+            </div>
+            <div className={`max-w-[82%] ${msg.role === "user" ? "" : "space-y-1"}`}>
               <div
-                className={`rounded-lg px-4 py-3 text-sm ${
+                className={`px-4 py-3 text-sm ${
                   msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
+                    ? "rounded-2xl rounded-tr-sm bg-ink-800 text-white"
+                    : "rounded-2xl rounded-tl-sm border border-brand-200 bg-white text-brand-900"
                 }`}
               >
                 {msg.role === "assistant" ? (
@@ -319,7 +326,7 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t p-3">
+      <div className="border-t border-brand-200 bg-white p-3">
         <div className="flex gap-2">
           <Textarea
             value={input}

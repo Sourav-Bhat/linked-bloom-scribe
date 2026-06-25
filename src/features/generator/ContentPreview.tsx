@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ContentPost } from '@/lib/types';
 import { RefreshCw, Edit, Check, Save, Copy, CheckCheck } from "lucide-react";
@@ -121,7 +121,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
             )}
           </Button>
         </CardTitle>
-        <CardDescription className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>{editMode ? "Review and edit your content" : "Exactly how it will look on LinkedIn"}</span>
           <Badge
             variant={withinBand ? "secondary" : "destructive"}
@@ -129,7 +129,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({
           >
             {words} words · {withinBand ? "on target" : `aim ${band.min}–${band.max}`}
           </Badge>
-        </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isEditing ? (

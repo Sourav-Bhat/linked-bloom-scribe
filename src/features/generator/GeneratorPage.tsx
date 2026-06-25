@@ -73,11 +73,14 @@ const Generator = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">
-        {editMode ? "Edit LinkedIn Post" : "Content Generator"}
-      </h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight">{editMode ? "Edit post" : "Generator"}</h1>
+        <p className="mt-1 max-w-[60ch] text-brand-500">
+          AI ghostwriting that sounds like you — drawn from your persona, pillars and avoid-list, never generic.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[380px_1fr]">
         <div>
           <ContentForm
             formData={formData}

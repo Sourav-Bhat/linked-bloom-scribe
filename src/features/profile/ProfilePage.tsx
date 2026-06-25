@@ -11,8 +11,13 @@ const Profile = () => {
   if (!user) return null;
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Profile</h1>
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold tracking-tight">Persona &amp; Agent</h1>
+        <p className="mt-1 max-w-[60ch] text-brand-500">
+          The engine behind every post — and the strategist that keeps refining it as it learns about you.
+        </p>
+      </div>
 
       <Tabs defaultValue="persona" className="space-y-6">
         <TabsList>

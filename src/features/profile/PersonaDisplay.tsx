@@ -136,7 +136,8 @@ const PersonaDisplay = ({ userId }: PersonaDisplayProps) => {
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-primary">{persona.archetype.name}</h2>
+              <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-brand-400">Your archetype</p>
+              <h2 className="text-2xl font-extrabold tracking-tight brand-gradient-text">{persona.archetype.name}</h2>
               <p className="text-base italic text-muted-foreground">{persona.archetype.tagline}</p>
             </div>
             <Button
