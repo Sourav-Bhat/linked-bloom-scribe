@@ -9,9 +9,15 @@ Hosting site** so it's isolated from the public app.
 ## What it does
 - **Dashboard** — totals (users / pending / approved / onboarded) + recent signups.
 - **Waitlist** — pending users with one-click **Approve / Reject** (calls `setUserAccess`).
-- **Users** — the whole user base: search, filter by status, approve/reject.
+- **Users** — the whole user base: search, filter by status, approve/reject, and
+  **(re)issue an email activation link** for email/password users (copy/share it directly).
 - **Analytics** — signups over the last 14 days + access-status breakdown (extensible).
 - **Account** — send yourself a password-reset email (to change the temp password).
+
+> **Email delivery:** verification and password-reset emails are sent **natively by
+> Firebase Auth** (no SMTP needed). The "activation link" action also *returns the link*
+> so you can share it directly even without an email sender. Notification emails (e.g.
+> "you're approved", "new signup") only send if you configure a Trigger-Email/SMTP sender.
 
 ## Security model
 - Only users with the Firebase **`admin` custom claim** can use it. The login screen

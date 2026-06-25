@@ -46,26 +46,19 @@ const handler = async (req: Request, res: Response): Promise<void> => {
       );
       const userRec = await admin.auth().getUser(uid).catch(() => null);
       if (userRec?.email) {
-        if (userRec.emailVerified) {
-          // Google / already-verified — straight to access.
-          await queueEmail(
-            userRec.email,
-            "You're approved — welcome to LinkedBloom",
-            `<p>Good news — your LinkedBloom access has been approved. 🎉</p>
-             <p><strong>Sign in again</strong> to set up your persona and start posting.</p>`,
-          );
-        } else {
-          // Email/password — must verify ownership before access. Include a link.
-          let link = '';
-          try { link = await admin.auth().generateEmailVerificationLink(userRec.email); } catch { /* best effort */ }
-          await queueEmail(
-            userRec.email,
-            "You're approved — verify your email to get started",
-            `<p>Good news — your LinkedBloom access has been approved. 🎉</p>
-             <p>One last step: <strong>verify your email</strong> to unlock the platform.</p>
-             ${link ? `<p><a href="${link}">Verify my email →</a></p>` : '<p>Sign in and follow the prompt to verify your email.</p>'}`,
-          );
-        }
+        // Best-effort approval notification (only delivered if an SMTP/Trigger-Email
+        // sender is configured). Email verification itself is handled by Firebase
+        // Auth natively when the user signs in (the app's /verify-email screen sends
+        // the link), so we don't embed a verification link here.
+        const verifyNote = userRec.emailVerified
+          ? ''
+          : " You'll be asked to verify your email on first sign-in.";
+        await queueEmail(
+          userRec.email,
+          "You're approved — welcome to LinkedBloom",
+          `<p>Good news — your LinkedBloom access has been approved. 🎉</p>
+           <p><strong>Sign in</strong> to set up your persona and start posting.${verifyNote}</p>`,
+        );
       }
     } else {
       await admin.auth().setCustomUserClaims(uid, { approved: false });

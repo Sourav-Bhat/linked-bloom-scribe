@@ -41,6 +41,29 @@ export async function setUserAccess(uid: string, action: "approve" | "reject"): 
   }
 }
 
+export interface ActivationResult {
+  email?: string;
+  link?: string;
+  alreadyVerified?: boolean;
+}
+
+/**
+ * Ask the backend to (re)issue an email-verification ("activation") link for a
+ * user. Returns the link so it can be copied/shared; the backend also queues an
+ * email (delivered only if an SMTP sender is configured).
+ */
+export async function resendActivation(uid: string): Promise<ActivationResult> {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`${FUNCTIONS_BASE_URL}/resendActivation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ uid }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data as ActivationResult;
+}
+
 export interface UserStats {
   total: number;
   pending: number;

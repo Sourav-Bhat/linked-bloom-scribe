@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Search, RefreshCw, Check, X } from "lucide-react";
+import { Search, RefreshCw, Check, X, MailPlus, Copy, ExternalLink } from "lucide-react";
 import { Button, Card, Input, Spinner, StatusBadge } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useUsers } from "@/hooks/useUsers";
-import { setUserAccess, type AccessStatus } from "@/services/admin";
+import { setUserAccess, resendActivation, type AccessStatus, type ActivationResult } from "@/services/admin";
 import { fmtDate, relativeTime, cn } from "@/lib/utils";
 
 const FILTERS: { id: "all" | AccessStatus; label: string }[] = [
@@ -19,6 +19,7 @@ const UsersPage = () => {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | AccessStatus>("all");
   const [busy, setBusy] = useState<string | null>(null);
+  const [activation, setActivation] = useState<(ActivationResult & { email: string }) | null>(null);
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -39,6 +40,35 @@ const UsersPage = () => {
       toast(e?.message ?? "Action failed", "error");
     } finally {
       setBusy(null);
+    }
+  };
+
+  const sendActivation = async (uid: string, email?: string) => {
+    setBusy(uid + "activate");
+    try {
+      const res = await resendActivation(uid);
+      if (res.alreadyVerified) {
+        toast(`${res.email ?? email ?? "User"} is already verified`);
+      } else if (res.link) {
+        setActivation({ ...res, email: res.email ?? email ?? "" });
+        toast("Activation link ready");
+      } else {
+        toast("Couldn't generate a link", "error");
+      }
+    } catch (e: any) {
+      toast(e?.message ?? "Failed to issue link", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!activation?.link) return;
+    try {
+      await navigator.clipboard.writeText(activation.link);
+      toast("Link copied to clipboard");
+    } catch {
+      toast("Copy failed — select and copy manually", "error");
     }
   };
 
@@ -113,6 +143,17 @@ const UsersPage = () => {
                             {busy === u.id + "approve" ? <Spinner className="h-4 w-4 border-white/40 border-t-white" /> : <Check className="h-4 w-4" />}
                           </Button>
                         )}
+                        {u.signUpProvider !== "google.com" && (
+                          <Button
+                            variant="secondary"
+                            className="px-2 py-1.5"
+                            onClick={() => sendActivation(u.id, u.email)}
+                            disabled={busy !== null}
+                            title="Send / copy email activation link"
+                          >
+                            {busy === u.id + "activate" ? <Spinner className="h-4 w-4" /> : <MailPlus className="h-4 w-4" />}
+                          </Button>
+                        )}
                         {u.accessStatus !== "rejected" && (
                           <Button variant="secondary" className="px-2 py-1.5" onClick={() => act(u.id, "reject")} disabled={busy !== null} title="Reject">
                             {busy === u.id + "reject" ? <Spinner className="h-4 w-4" /> : <X className="h-4 w-4" />}
@@ -127,6 +168,51 @@ const UsersPage = () => {
           </div>
         )}
       </Card>
+
+      {activation && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4"
+          onClick={() => setActivation(null)}
+        >
+          <Card className="w-full max-w-lg p-6" >
+            <div onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">Activation link</h2>
+                  <p className="mt-1 text-sm text-brand-500">
+                    For <span className="font-medium text-brand-700">{activation.email}</span>. Share this
+                    link so they can verify their email and activate access.
+                  </p>
+                </div>
+                <button onClick={() => setActivation(null)} className="text-brand-400 hover:text-brand-700">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <Input readOnly value={activation.link} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+                <Button variant="primary" onClick={copyLink} title="Copy link"><Copy className="h-4 w-4" /> Copy</Button>
+              </div>
+
+              <div className="mt-3 flex items-center gap-3">
+                <a
+                  href={activation.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 hover:text-violet-500"
+                >
+                  <ExternalLink className="h-4 w-4" /> Open link
+                </a>
+              </div>
+
+              <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-500">
+                An email with this link was also queued — it's delivered automatically only if an email
+                sender (e.g. the Trigger&nbsp;Email extension) is configured. Until then, share the link directly.
+              </p>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
