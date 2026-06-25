@@ -44,12 +44,26 @@ const handler = async (req: Request, res: Response): Promise<void> => {
       );
       const userRec = await admin.auth().getUser(uid).catch(() => null);
       if (userRec?.email) {
-        await queueEmail(
-          userRec.email,
-          "You're approved — welcome to LinkedBloom",
-          `<p>Good news — your LinkedBloom access has been approved. 🎉</p>
-           <p><strong>Sign in again</strong> to set up your persona and start posting.</p>`,
-        );
+        if (userRec.emailVerified) {
+          // Google / already-verified — straight to access.
+          await queueEmail(
+            userRec.email,
+            "You're approved — welcome to LinkedBloom",
+            `<p>Good news — your LinkedBloom access has been approved. 🎉</p>
+             <p><strong>Sign in again</strong> to set up your persona and start posting.</p>`,
+          );
+        } else {
+          // Email/password — must verify ownership before access. Include a link.
+          let link = '';
+          try { link = await admin.auth().generateEmailVerificationLink(userRec.email); } catch { /* best effort */ }
+          await queueEmail(
+            userRec.email,
+            "You're approved — verify your email to get started",
+            `<p>Good news — your LinkedBloom access has been approved. 🎉</p>
+             <p>One last step: <strong>verify your email</strong> to unlock the platform.</p>
+             ${link ? `<p><a href="${link}">Verify my email →</a></p>` : '<p>Sign in and follow the prompt to verify your email.</p>'}`,
+          );
+        }
       }
     } else {
       await admin.auth().setCustomUserClaims(uid, { approved: false });

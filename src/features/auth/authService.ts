@@ -4,6 +4,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  sendEmailVerification,
   type User,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -61,4 +62,16 @@ export const getIdToken = async (): Promise<string | null> => {
   const user = auth.currentUser;
   if (!user) return null;
   return user.getIdToken();
+};
+
+/** Send Firebase's built-in email-verification link to the current user. */
+export const sendVerificationEmail = async (): Promise<void> => {
+  const user = auth.currentUser;
+  if (user) await sendEmailVerification(user);
+};
+
+/** Reload the current user so freshly-changed properties (e.g. emailVerified) are picked up. */
+export const reloadCurrentUser = async (): Promise<void> => {
+  const user = auth.currentUser;
+  if (user) await user.reload();
 };

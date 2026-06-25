@@ -17,6 +17,7 @@ import NotFound from "@/features/notfound/NotFoundPage";
 import AuthPage from "@/features/auth/AuthPage";
 import LandingPage from "@/features/marketing/LandingPage";
 import PendingPage from "@/features/auth/PendingPage";
+import VerifyEmailPage from "@/features/auth/VerifyEmailPage";
 import Onboarding from "@/features/onboarding/OnboardingPage";
 import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -34,22 +35,27 @@ const queryClient = new QueryClient({
 export const AuthContext = createContext<{
   user: User | null;
   approved: boolean;
+  emailVerified: boolean;
   onboardingCompleted: boolean | null;
   setOnboardingCompleted?: (val: boolean) => void;
   refreshApproval?: () => Promise<boolean>;
-}>({ user: null, approved: false, onboardingCompleted: null });
+}>({ user: null, approved: false, emailVerified: false, onboardingCompleted: null });
 
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [approved, setApproved] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
 
-  // Force a token refresh to pick up a freshly-granted `approved` claim, then
-  // re-read state. Used by the /pending "Refresh status" button.
+  // Reload the user + force a token refresh to pick up a freshly-granted
+  // `approved` claim or a just-completed email verification, then re-read state.
+  // Used by the /pending and /verify-email "refresh / I've verified" buttons.
   const refreshApproval = async (): Promise<boolean> => {
     const u = auth.currentUser;
     if (!u) return false;
+    try { await u.reload(); } catch { /* ignore */ }
+    setEmailVerified(u.emailVerified);
     const tr = await u.getIdTokenResult(true);
     const ok = tr.claims.approved === true;
     setApproved(ok);
@@ -67,6 +73,7 @@ const App = () => {
       setUser(firebaseUser);
 
       if (firebaseUser) {
+        setEmailVerified(firebaseUser.emailVerified);
         try {
           const tokenResult = await firebaseUser.getIdTokenResult();
           setApproved(tokenResult.claims.approved === true);
@@ -80,6 +87,7 @@ const App = () => {
         }
       } else {
         setApproved(false);
+        setEmailVerified(false);
         setOnboardingCompleted(null);
       }
 
@@ -101,12 +109,16 @@ const App = () => {
   }
 
   // Where an authenticated user belongs based on their gate state.
-  const homeFor = () => (!approved ? "/pending" : !onboardingCompleted ? "/onboarding" : "/");
+  // Google sign-in sets emailVerified=true automatically, so it skips /verify-email.
+  const homeFor = () =>
+    !approved ? "/pending" :
+    !emailVerified ? "/verify-email" :
+    !onboardingCompleted ? "/onboarding" : "/";
 
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthContext.Provider value={{ user, approved, onboardingCompleted, setOnboardingCompleted, refreshApproval }}>
+        <AuthContext.Provider value={{ user, approved, emailVerified, onboardingCompleted, setOnboardingCompleted, refreshApproval }}>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -130,10 +142,20 @@ const App = () => {
                   }
                 />
                 <Route
+                  path="/verify-email"
+                  element={
+                    !user ? <Navigate to="/login" /> :
+                    !approved ? <Navigate to="/pending" /> :
+                    emailVerified ? <Navigate to="/" /> :
+                    <VerifyEmailPage />
+                  }
+                />
+                <Route
                   path="/onboarding"
                   element={
                     !user ? <Navigate to="/login" /> :
                     !approved ? <Navigate to="/pending" /> :
+                    !emailVerified ? <Navigate to="/verify-email" /> :
                     onboardingCompleted ? <Navigate to="/" /> :
                     <Onboarding />
                   }
@@ -143,6 +165,7 @@ const App = () => {
                   element={
                     !user ? <LandingPage /> :
                     !approved ? <Navigate to="/pending" /> :
+                    !emailVerified ? <Navigate to="/verify-email" /> :
                     !onboardingCompleted ? <Navigate to="/onboarding" /> :
                     <Layout />
                   }
