@@ -10,8 +10,9 @@ const adminUids = (): string[] =>
 
 /**
  * Admin-only: approve or reject a user for the closed beta.
- * Authorization is by uid allowlist (ADMIN_UIDS), independent of claims, so the
- * first admin can call it before any claim is set.
+ * Authorized for callers who carry the `admin` custom claim OR whose uid is in
+ * the ADMIN_UIDS allowlist (the allowlist lets the very first admin call it
+ * before any claim exists).
  * Body: { uid: string, action: "approve" | "reject" }.
  */
 const handler = async (req: Request, res: Response): Promise<void> => {
@@ -23,7 +24,8 @@ const handler = async (req: Request, res: Response): Promise<void> => {
   if (res.headersSent) return;
 
   const callerUid: string = (req as any).uid;
-  if (!adminUids().includes(callerUid)) {
+  const isAdminClaim: boolean = (req as any).isAdmin === true;
+  if (!isAdminClaim && !adminUids().includes(callerUid)) {
     res.status(403).json({ error: 'Not authorized to manage access.' });
     return;
   }

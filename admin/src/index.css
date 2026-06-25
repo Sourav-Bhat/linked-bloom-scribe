@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { font-family: 'Inter', sans-serif; }
+  body { @apply bg-brand-50 text-brand-900; }
+}
+
+@layer utilities {
+  .brand-gradient { background-image: linear-gradient(135deg, #6555E6, #EDA838); }
+  .brand-gradient-text {
+    background-image: linear-gradient(135deg, #6555E6, #EDA838);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
