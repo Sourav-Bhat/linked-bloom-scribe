@@ -133,6 +133,10 @@ const Onboarding = () => {
       });
 
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) {
+        throw new Error("AI service is misconfigured (received a non-JSON response). Check Hosting rewrites / VITE_CLOUD_FUNCTIONS_BASE_URL.");
+      }
       const responseData = await res.json();
 
       if (responseData?.persona) {

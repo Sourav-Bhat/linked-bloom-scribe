@@ -138,6 +138,10 @@ const useContentGeneration = (userId: string | undefined) => {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `Request failed (${res.status})`);
     }
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      throw new Error("AI service is misconfigured (received a non-JSON response). Check Hosting rewrites / VITE_CLOUD_FUNCTIONS_BASE_URL.");
+    }
     const data = await res.json();
     if (data?.error) throw new Error(data.error);
     return data;

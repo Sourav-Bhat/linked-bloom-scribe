@@ -273,7 +273,8 @@ export const ProfileForm = ({ userId }: ProfileFormProps) => {
         }),
       });
 
-      if (!res.ok) {
+      const ct = res.headers.get("content-type") || "";
+      if (!res.ok || !ct.includes("application/json")) {
         toast({ title: "Profile saved", description: "But persona regeneration failed. Regenerate it from the My Persona tab.", variant: "destructive" });
       } else {
         toast({ title: "Persona updated!", description: "Your LinkedIn strategy has been refreshed." });

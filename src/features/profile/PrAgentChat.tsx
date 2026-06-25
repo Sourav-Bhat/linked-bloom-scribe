@@ -135,6 +135,11 @@ const PrAgentChat = ({ userId }: PrAgentChatProps) => {
         throw new Error(errData.error || `Request failed (${resp.status})`);
       }
 
+      const ct = resp.headers.get("content-type") || "";
+      if (ct.includes("text/html")) {
+        throw new Error("AI service is misconfigured (received a non-JSON response). Check Hosting rewrites / VITE_CLOUD_FUNCTIONS_BASE_URL.");
+      }
+
       if (!resp.body) throw new Error("No response body");
 
       const reader = resp.body.getReader();
