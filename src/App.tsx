@@ -13,7 +13,8 @@ import Generator from "@/features/generator/GeneratorPage";
 import Calendar from "@/features/calendar/CalendarPage";
 import Review from "@/features/review/ReviewPage";
 import NotFound from "@/features/notfound/NotFoundPage";
-import Login from "@/features/auth/LoginPage";
+import AuthPage from "@/features/auth/AuthPage";
+import LandingPage from "@/features/marketing/LandingPage";
 import Onboarding from "@/features/onboarding/OnboardingPage";
 import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -82,7 +83,11 @@ const App = () => {
               <Routes>
                 <Route
                   path="/login"
-                  element={user ? <Navigate to={onboardingCompleted ? "/" : "/onboarding"} /> : <Login />}
+                  element={user ? <Navigate to={onboardingCompleted ? "/" : "/onboarding"} /> : <AuthPage mode="login" />}
+                />
+                <Route
+                  path="/signup"
+                  element={user ? <Navigate to={onboardingCompleted ? "/" : "/onboarding"} /> : <AuthPage mode="signup" />}
                 />
                 <Route
                   path="/onboarding"
@@ -95,7 +100,7 @@ const App = () => {
                 <Route
                   path="/"
                   element={
-                    !user ? <Navigate to="/login" /> :
+                    !user ? <LandingPage /> :
                     !onboardingCompleted ? <Navigate to="/onboarding" /> :
                     <Layout />
                   }

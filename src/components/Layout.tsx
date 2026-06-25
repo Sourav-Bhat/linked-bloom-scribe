@@ -1,120 +1,48 @@
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import { Toaster } from "@/components/ui/toaster";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu, X, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Menu, X } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 
 const Layout = () => {
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [extensionWarning, setExtensionWarning] = useState(false);
-  const isMobile = useIsMobile();
-
-  useEffect(() => {
-    // Detect potential browser extension interference
-    const checkForExtensionInterference = () => {
-      // Check for common extension indicators
-      const extensionIndicators = [
-        'clearly-extension',
-        'adblock',
-        'ublock',
-        'ghostery',
-        'disconnect'
-      ];
-
-      const hasExtensionInterference = extensionIndicators.some(indicator =>
-        document.querySelector(`[class*="${indicator}"]`) ||
-        document.querySelector(`[id*="${indicator}"]`) ||
-        window.location.href.includes('extension')
-      );
-
-      // Check for blocked resources
-      const hasBlockedResources = performance.getEntriesByType('resource').some(
-        (entry: any) => entry.transferSize === 0 && entry.decodedBodySize === 0
-      );
-
-      if (hasExtensionInterference || hasBlockedResources) {
-        console.warn('Potential browser extension interference detected');
-        setExtensionWarning(true);
-      }
-    };
-
-    // Run check after a delay to let page load
-    const timer = setTimeout(checkForExtensionInterference, 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const toggleSidebar = () => {
-    setShowMobileSidebar(!showMobileSidebar);
-  };
-
-  const dismissWarning = () => {
-    setExtensionWarning(false);
-    localStorage.setItem('extension-warning-dismissed', 'true');
-  };
-
-  // Check if warning was previously dismissed
-  const warningDismissed = localStorage.getItem('extension-warning-dismissed') === 'true';
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Navbar />
-      
-      {/* Extension Warning */}
-      {extensionWarning && !warningDismissed && (
-        <Alert className="mx-4 mt-2 border-orange-200 bg-orange-50">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span className="text-sm">
-              Browser extensions may be interfering with the app. Try disabling extensions if you experience issues.
-            </span>
-            <Button variant="ghost" size="sm" onClick={dismissWarning}>
-              Dismiss
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      <div className="flex-1 flex relative">
-        {/* Mobile menu toggle */}
-        {isMobile && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="absolute top-2 left-2 z-20 md:hidden"
-            onClick={toggleSidebar}
-          >
-            {showMobileSidebar ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-        )}
-        
-        {/* Mobile backdrop */}
-        {isMobile && showMobileSidebar && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
-            onClick={() => setShowMobileSidebar(false)}
-          />
-        )}
-        
-        {/* Sidebar */}
-        <div 
-          className={`${
-            isMobile 
-              ? `fixed inset-y-0 left-0 z-20 transform ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-200 ease-in-out md:relative md:translate-x-0`
-              : 'relative'
-          }`}
-        >
+    <div className="min-h-screen bg-brand-50">
+      <div className="md:grid md:grid-cols-[256px_1fr]">
+        {/* Desktop sidebar */}
+        <div className="sticky top-0 hidden h-screen md:block">
           <Sidebar />
         </div>
-        
-        {/* Main content */}
-        <main className="flex-1 p-4 md:p-6 pt-10 md:pt-6 w-full max-w-7xl mx-auto">
-          <Outlet />
-        </main>
+
+        {/* Mobile slide-in sidebar */}
+        {mobileOpen && (
+          <>
+            <div className="fixed inset-0 z-40 bg-ink-900/40 md:hidden" onClick={() => setMobileOpen(false)} />
+            <div className="fixed inset-y-0 left-0 z-50 md:hidden">
+              <Sidebar onNavigate={() => setMobileOpen(false)} />
+            </div>
+          </>
+        )}
+
+        <div className="flex min-w-0 flex-col">
+          {/* Mobile topbar */}
+          <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-brand-200 bg-white px-4 py-3 md:hidden">
+            <button
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open menu"
+              className="grid h-9 w-9 place-items-center rounded-lg border border-brand-200 bg-white"
+            >
+              <Menu className="h-[18px] w-[18px]" />
+            </button>
+            <BrandLogo size={28} />
+          </div>
+
+          <main className="mx-auto w-full max-w-[1180px] px-4 py-6 md:px-8 md:py-8">
+            <Outlet />
+          </main>
+        </div>
       </div>
       <Toaster />
     </div>
