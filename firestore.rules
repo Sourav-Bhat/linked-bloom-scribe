@@ -1,32 +1,42 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isApproved() { return isSignedIn() && request.auth.token.approved == true; }
+    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
+
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-      match /persona/{doc} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+      // A signed-in user may create their own record, but only as "pending".
+      allow create: if isOwner(uid) && request.resource.data.accessStatus == 'pending';
+
+      // Owners read their own record; admins read anyone's (the approval queue).
+      allow read: if isOwner(uid) || isAdmin();
+
+      // Updates may never change accessStatus from the client. Approved users may
+      // edit their profile; pending users may only bump lastLoginAt. Admins: any.
+      allow update: if isAdmin() || (
+        isOwner(uid)
+        && request.resource.data.accessStatus == resource.data.accessStatus
+        && (
+          isApproved()
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt'])
+        )
+      );
+
+      allow delete: if isAdmin();
+
+      // All app data under the user (persona, posts, chatMessages, postAnalytics,
+      // engagements, inspirations, linkedinAccount, extensionEvents, …):
+      // owner AND approved only. Admins may access for support.
+      match /{document=**} {
+        allow read, write: if (isOwner(uid) && isApproved()) || isAdmin();
       }
-      match /posts/{postId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-      match /chatMessages/{msgId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-      match /linkedinAccount/{doc} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-      match /postAnalytics/{id} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-      match /engagements/{id} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-      match /inspirations/{id} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-      match /extensionEvents/{id} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
+    }
+
+    // Trigger Email extension queue — written only by Cloud Functions (Admin SDK).
+    match /mail/{id} {
+      allow read, write: if false;
     }
   }
 }

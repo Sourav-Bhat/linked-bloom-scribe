@@ -19,6 +19,7 @@
       { "source": "/generateContent", "function": { "functionId": "generateContent", "region": "us-central1" } },
       { "source": "/personaAgent", "function": { "functionId": "personaAgent", "region": "us-central1" } },
       { "source": "/prAgentChat", "function": { "functionId": "prAgentChat", "region": "us-central1" } },
+      { "source": "/setUserAccess", "function": { "functionId": "setUserAccess", "region": "us-central1" } },
       { "source": "**", "destination": "/index.html" }
     ]
   },

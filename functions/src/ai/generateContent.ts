@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import { Request, Response } from 'express';
-import { verifyToken } from '../middleware/verifyToken';
+import { verifyToken, rejectIfNotApproved } from '../middleware/verifyToken';
 import { generateText } from '../utils/geminiClient';
 import { baseHttpsOptions } from '../utils/httpsOptions';
 
@@ -12,6 +12,7 @@ const handler = async (req: Request, res: Response): Promise<void> => {
     verifyToken(req, res, (err?: any) => (err ? reject(err) : resolve()))
   );
   if (res.headersSent) return;
+  if (rejectIfNotApproved(req, res)) return;
 
   const uid: string = (req as any).uid;
   const { topic, tone, instructions, includeHashtags, postLength, regeneratePrompt, previousContent, model } = req.body;

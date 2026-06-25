@@ -53,14 +53,17 @@ jobs:
       - name: Install Cloud Functions dependencies
         run: npm ci --prefix functions
 
-      - name: Write Cloud Functions env (prod Langfuse keys)
+      - name: Write Cloud Functions env (prod Langfuse keys + beta gate)
         # firebase deploy loads functions/.env and sets these as the deployed
-        # functions' runtime env vars. Uses the PROD Langfuse project keys.
+        # functions' runtime env vars. Uses the PROD Langfuse project keys and
+        # the closed-beta admin config (ADMIN_EMAIL / ADMIN_UIDS).
         run: |
           cat > functions/.env <<EOF
           LANGFUSE_SECRET_KEY=${{ secrets.LANGFUSE_SECRET_KEY }}
           LANGFUSE_PUBLIC_KEY=${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_BASE_URL=${{ secrets.LANGFUSE_BASE_URL }}
+          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+          ADMIN_UIDS=${{ secrets.ADMIN_UIDS }}
           EOF
 
       - name: Authenticate to Google Cloud
